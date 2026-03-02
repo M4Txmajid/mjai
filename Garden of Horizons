@@ -1,1 +1,826 @@
+--// Brainrot TP - Toggle Version with Instant Stop + Smooth Return
+do
 
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
+
+local CFG = {
+	BRAINROT_PATH = workspace:WaitForChild("ActiveBrainrots"),
+	LUCKYBLOCK_PATH = workspace:WaitForChild("ActiveLuckyBlocks"),
+	TSUNAMI_PATH = workspace:WaitForChild("ActiveTsunamis"),
+	TWEEN_SPEED = 200,
+	TRAVEL_DEPTH = -30,
+	GRAB_HEIGHT = 5,
+	RISE_SPEED = 150,
+	DIVE_SPEED = 200,
+	WAIT_AT_TARGET = 0.3,
+	AUTO_LOOP = true,
+	PROMPT_OVERRIDE_DISTANCE = 9999,
+	WAVE_SAFE_DISTANCE = 120,
+	WAVE_CHECK_INTERVAL = 0.3,
+	WAVE_MAX_WAIT = 30,
+	TOWER_CFRAME = CFrame.new(4329.02148, 6.50959015, -2.42385221, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	TRIAL_TIME_LIMIT = 260,
+	TRIAL_COOLDOWN_WAIT = 5,
+	TRACKER_INTERVAL = 5,
+	TRIAL_BATCH_SIZE = 3,
+}
+CFG.TOWER_POSITION = CFG.TOWER_CFRAME.Position
+local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
+local ST = {
+	running = false, returning = false,
+	activeTab = "Brainrot", farmingTab = "Brainrot",
+	brainrotSelectedRarities = {}, luckyBlockSelectedRarities = {},
+	brainrotCheckboxes = {}, luckyBlockCheckboxes = {},
+	totalGrabbed = 0,
+	autoTrialEnabled = false, autoTrialRunning = false,
+	trialInProgress = false, trialGrabbed = 0, trialRequired = 0,
+	trialCollecting = false,
+	currentTrialRarity = nil, currentTrialFolder = nil,
+	previousTrialRarity = nil, rarityChangeCount = 0,
+	lastScanResult = nil, lastScanFolder = nil,
+	continuousTrackerRunning = false, trackerScanCount = 0,
+	savedTrialSelections = {}, savedTrialTab = nil, trialAutoSelected = false,
+	floorOriginalData = {}, floorsCleared = false, floorClearEnabled = true,
+	currentMapName = "None", mapWatcherConnection = nil,
+	savedPosition = nil, savedCFrame = nil,
+	bodyVel = nil, bodyGyro = nil,
+	physicsLocked = false, frameConn = nil,
+	savedWalkSpeed = 16, savedJumpPower = 50,
+	currentTween = nil, tweening = false,
+	noclipEnabled = false, noclipConnection = nil,
+	autoInstantEnabled = false, promptConnections = {},
+	minimized = false, autoReturnEnabled = true, waveCheckEnabled = true,
+}
+local UI = {}
+
+--// ===================== FLOOR SCANNER ===================== --
+local function findCurrentFloorsFolder()
+	for _, child in pairs(workspace:GetChildren()) do
+		if string.find(child.Name, "SharedInstances") or string.find(child.Name, "_Shared") then
+			local floors = child:FindFirstChild("Floors")
+			if floors then return floors, child.Name end
+			for _, desc in pairs(child:GetDescendants()) do if desc.Name == "Floors" then return desc, child.Name end end
+		end
+	end
+	for _, child in pairs(workspace:GetChildren()) do
+		if child.Name == "Floors" then return child, "workspace" end
+		local floors = child:FindFirstChild("Floors"); if floors then return floors, child.Name end
+	end
+	for _, desc in pairs(workspace:GetDescendants()) do
+		if desc.Name == "Floors" and #desc:GetChildren() > 0 then
+			local has = false; for _, fc in pairs(desc:GetDescendants()) do if fc:IsA("BasePart") then has = true; break end end
+			if has then return desc, desc.Parent and desc.Parent.Name or "unknown" end
+		end
+	end; return nil, "None"
+end
+local function getAllFloorParts(f)
+	local parts = {}; if not f or not f.Parent then return parts end
+	for _, d in pairs(f:GetDescendants()) do if d:IsA("BasePart") then table.insert(parts, d) end end; return parts
+end
+local function clearFloors()
+	if not ST.floorClearEnabled or ST.floorsCleared then return end
+	local f, m = findCurrentFloorsFolder(); if not f then ST.currentMapName = "No floors"; return end
+	ST.currentMapName = m; ST.floorsCleared = true; ST.floorOriginalData = {}
+	for _, p in pairs(getAllFloorParts(f)) do
+		table.insert(ST.floorOriginalData, {Part=p, Transparency=p.Transparency, CanCollide=p.CanCollide})
+		p.Transparency = 1; p.CanCollide = false
+	end
+end
+local function restoreFloors()
+	if not ST.floorsCleared then return end
+	for _, d in pairs(ST.floorOriginalData) do if d.Part and d.Part.Parent then d.Part.Transparency = d.Transparency; d.Part.CanCollide = d.CanCollide end end
+	ST.floorOriginalData = {}; ST.floorsCleared = false
+end
+local function updateFloorLabel()
+	if not UI.FloorLabel then return end
+	if ST.floorsCleared then
+		UI.FloorLabel.Text = string.format("Floors: CLEARED [%s] (%d)", ST.currentMapName:gsub("_SharedInstances",""):gsub("SharedInstances",""), #ST.floorOriginalData)
+		UI.FloorLabel.TextColor3 = Color3.fromRGB(255,100,100)
+	else
+		local f, m = findCurrentFloorsFolder()
+		if f then UI.FloorLabel.Text = string.format("Floors: Ready [%s] (%d)", m:gsub("_SharedInstances",""):gsub("SharedInstances",""), #getAllFloorParts(f)); UI.FloorLabel.TextColor3 = Color3.fromRGB(100,255,100)
+		else UI.FloorLabel.Text = "Floors: No map"; UI.FloorLabel.TextColor3 = Color3.fromRGB(255,180,80) end
+	end
+end
+local function checkMapChange()
+	if ST.floorClearEnabled and ST.floorsCleared then
+		local f, m = findCurrentFloorsFolder()
+		if f and m ~= ST.currentMapName then restoreFloors(); task.wait(0.3); clearFloors(); updateFloorLabel() end
+	end
+end
+local function startMapWatcher()
+	if ST.mapWatcherConnection then return end
+	ST.mapWatcherConnection = workspace.ChildAdded:Connect(function(child)
+		if string.find(child.Name, "SharedInstances") or string.find(child.Name, "_Shared") then
+			task.wait(2); local floors = child:FindFirstChild("Floors")
+			if not floors then for _, d in pairs(child:GetDescendants()) do if d.Name == "Floors" then floors = d; break end end end
+			if floors then if ST.floorsCleared then restoreFloors() end; ST.currentMapName = child.Name
+				if ST.running or ST.autoTrialRunning then task.wait(0.5); clearFloors() end; updateFloorLabel() end
+		end end)
+	workspace.ChildRemoved:Connect(function(child)
+		if string.find(child.Name, "SharedInstances") or string.find(child.Name, "_Shared") then
+			local nd = {}; for _, d in pairs(ST.floorOriginalData) do if d.Part and d.Part.Parent then table.insert(nd, d) end end; ST.floorOriginalData = nd
+			if #ST.floorOriginalData == 0 and ST.floorsCleared then ST.floorsCleared = false
+				if ST.running or ST.autoTrialRunning then task.wait(2); clearFloors() end; updateFloorLabel() end
+		end end)
+end
+
+--// ===================== RARITY / SCANNER ===================== --
+local RARITY_KEYWORDS = {"divine","secret","mythical","mythic","legendary","epic","rare","uncommon","common"}
+local function getInfoFrame() local ok, i = pcall(function() return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Billboard.BillboardGui.Frame.Info end); return ok and i or nil end
+local function getTrialTimerContainer() local i = getInfoFrame(); return i and i:FindFirstChild("TrialTimerContainer") or nil end
+local function getCooldownContainer() local i = getInfoFrame(); return i and i:FindFirstChild("CooldownContainer") or nil end
+local function getProximityPrompt() local ok, p = pcall(function() return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Prompt.ProximityPrompt end); return (ok and p and p:IsA("ProximityPrompt")) and p or nil end
+
+local function extractRarityFromText(text)
+	if not text or #text == 0 then return nil, nil end; local lower = string.lower(text)
+	if string.find(lower, "time remaining") or string.find(lower, "cooldown") or string.find(lower, "seconds left") or string.find(lower, "minutes left") then return nil, nil end
+	if string.find(lower, "waiting") and not string.find(lower, "bring") then return nil, nil end
+	if lower:match("^%s*%d+%s*$") or lower:match("^%s*%d+:%d+%s*$") then return nil, nil end
+	for _, kw in ipairs(RARITY_KEYWORDS) do
+		if string.find(lower, kw) then
+			local c = tonumber(lower:match("(%d+)%s+"..kw)) or tonumber(lower:match(kw.."%s*x?(%d+)")) or tonumber(lower:match("x(%d+)")) or tonumber(lower:match("%((%d+)%)"))
+			if not c then for num in lower:gmatch("(%d+)") do local n = tonumber(num); if n and n >= 1 and n <= 50 then c = n; break end end end
+			return kw, c or 1
+		end
+	end; return nil, nil
+end
+
+local function scanTrialFromBillboard()
+	local dbg = {}; local info = getInfoFrame()
+	if info then local bm, bp = nil, 999
+		for _, desc in pairs(info:GetDescendants()) do
+			if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
+				local text = desc.Text; if text and #text > 1 then local lower = string.lower(text)
+					table.insert(dbg, string.format("[%s]%s", desc.Name, text))
+					local isT = false; local par = desc.Parent
+					while par and par ~= info do local pn = string.lower(par.Name)
+						if string.find(pn,"timer") or string.find(pn,"cooldown") or string.find(pn,"countdown") then isT = true; break end; par = par.Parent end
+					if isT then continue end
+					if lower:match("^%s*%d+%s*$") or lower:match("^%s*%d+:%d+") then continue end
+					if string.find(lower,"time") and string.find(lower,"%d") and not string.find(lower,"bring") then continue end
+					local r, c = extractRarityFromText(text)
+					if r then local pri = 50
+						if string.find(lower,"bring") then pri=1 elseif string.find(lower,"collect") then pri=2
+						elseif string.find(lower,"deliver") then pri=3 elseif string.find(lower,"need") then pri=4
+						elseif string.find(lower,"gather") then pri=5 elseif string.find(lower,"find") then pri=6
+						elseif string.find(lower,"get") then pri=7 end
+						if pri < bp then bp = pri; bm = {rarity=r,count=c,text=text} end
+					end
+				end
+			end
+		end
+		if bm then return bm.rarity, bm.count, bm.text, table.concat(dbg," | ") end
+	end
+	local pg = player:FindFirstChild("PlayerGui")
+	if pg then local bm, bp = nil, 999
+		for _, desc in pairs(pg:GetDescendants()) do
+			if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.Visible then
+				local text = desc.Text; if text and #text > 2 then local lower = string.lower(text)
+					local isTR = string.find(lower,"trial") or string.find(lower,"bring") or string.find(lower,"collect") or string.find(lower,"tsunami") or string.find(lower,"deliver") or (string.find(lower,"need") and string.find(lower,"brainrot"))
+					if not isTR then local p = desc.Parent; while p and p ~= pg do local pn = string.lower(p.Name)
+						if string.find(pn,"trial") or string.find(pn,"tsunami") or string.find(pn,"tower") or string.find(pn,"quest") then isTR = true; break end; p = p.Parent end end
+					if isTR then local r, c = extractRarityFromText(text)
+						if r then local pri = 50
+							if string.find(lower,"bring") then pri=1 elseif string.find(lower,"collect") then pri=2
+							elseif string.find(lower,"deliver") then pri=3 elseif string.find(lower,"need") then pri=4 end
+							if pri < bp then bp = pri; bm = {rarity=r,count=c,text=text} end end end
+				end
+			end
+		end
+		if bm then return bm.rarity, bm.count, bm.text, table.concat(dbg," | ").." [GUI]" end
+	end
+	return nil, nil, nil, table.concat(dbg," | ").." [NONE]"
+end
+
+local function scanWithRetry(ma, db)
+	ma = ma or 5; db = db or 0.4; local res = {}
+	for i = 1, ma do if not ST.autoTrialEnabled then return nil,nil,nil,"stopped" end
+		local r,c,t,d = scanTrialFromBillboard(); if r then res[r] = (res[r] or 0)+1; if res[r] >= 2 then return r,c,t,d end end
+		if i < ma then task.wait(db) end end
+	for i = 1, ma do local r,c,t,d = scanTrialFromBillboard(); if r then return r,c,t,d end; task.wait(0.2) end
+	return nil,nil,nil,"no_result"
+end
+
+local function isTrialOnCooldown()
+	local cd = getCooldownContainer(); if not cd then return false,"" end
+	local vis = true; pcall(function() vis = cd.Visible end); if not vis then return false,"" end
+	local t = ""; for _, d in pairs(cd:GetDescendants()) do if d:IsA("TextLabel") and d.Visible and d.Text and #d.Text > 0 then t = t.." "..d.Text end end
+	return #t > 0, t
+end
+local function isTrialTimerActive()
+	local tm = getTrialTimerContainer(); if not tm then return false,"" end
+	local vis = true; pcall(function() vis = tm.Visible end); if not vis then return false,"" end
+	local t = ""; for _, d in pairs(tm:GetDescendants()) do if d:IsA("TextLabel") and d.Visible and d.Text and #d.Text > 0 then t = t.." "..d.Text end end
+	if #t > 0 and string.find(t,"%d") then return true, t end; return false,""
+end
+
+local function matchRarityToFolder(kw)
+	if not kw then return nil end; local lower = string.lower(kw)
+	for _, c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if (c:IsA("Folder") or c:IsA("Model")) and string.lower(c.Name)==lower then return c.Name end end
+	for _, c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if (c:IsA("Folder") or c:IsA("Model")) then local cn=string.lower(c.Name); if string.find(cn,lower) or string.find(lower,cn) then return c.Name end end end
+	if #lower > 4 then local sh = lower:sub(1,-3)
+		for _, c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if (c:IsA("Folder") or c:IsA("Model")) then local cn=string.lower(c.Name); if string.find(cn,sh) or string.find(sh,cn) then return c.Name end end end end
+	return nil
+end
+
+local function saveCurrentSelections() ST.savedTrialSelections = {}; for n,v in pairs(ST.brainrotSelectedRarities) do ST.savedTrialSelections[n]=v end; ST.savedTrialTab=ST.activeTab; ST.trialAutoSelected=true end
+local function autoSelectTrialRarity(fn)
+	for n,d in pairs(ST.brainrotCheckboxes) do ST.brainrotSelectedRarities[n]=nil; d.Check.Text=""; d.Check.BackgroundColor3=Color3.fromRGB(50,50,70); d.Check.TextColor3=Color3.fromRGB(100,255,100) end
+	if ST.brainrotCheckboxes[fn] then ST.brainrotSelectedRarities[fn]=true; ST.brainrotCheckboxes[fn].Check.Text="★"; ST.brainrotCheckboxes[fn].Check.BackgroundColor3=Color3.fromRGB(0,160,255); ST.brainrotCheckboxes[fn].Check.TextColor3=Color3.fromRGB(255,255,0); return true end; return false
+end
+local function restorePreviousSelections()
+	if not ST.trialAutoSelected then return end
+	for n,d in pairs(ST.brainrotCheckboxes) do ST.brainrotSelectedRarities[n]=nil; d.Check.Text=""; d.Check.BackgroundColor3=Color3.fromRGB(50,50,70); d.Check.TextColor3=Color3.fromRGB(100,255,100) end
+	for n,v in pairs(ST.savedTrialSelections) do if v and ST.brainrotCheckboxes[n] then ST.brainrotSelectedRarities[n]=true; ST.brainrotCheckboxes[n].Check.Text="Y"; ST.brainrotCheckboxes[n].Check.BackgroundColor3=Color3.fromRGB(40,100,40) end end
+	ST.savedTrialSelections={}; ST.trialAutoSelected=false
+end
+local function resetRarityTracker() ST.previousTrialRarity=nil; ST.currentTrialRarity=nil; ST.currentTrialFolder=nil; ST.lastScanResult=nil; ST.lastScanFolder=nil; ST.rarityChangeCount=0; ST.trackerScanCount=0 end
+
+local function updateTrackerLabel()
+	if not UI.TrialTrackerLabel then return end
+	if ST.currentTrialRarity and ST.currentTrialFolder then
+		local ci = ""; if ST.rarityChangeCount > 0 then ci = string.format(" |S:%d", ST.rarityChangeCount); if ST.previousTrialRarity then ci = ci..string.format("(%s)", ST.previousTrialRarity) end end
+		UI.TrialTrackerLabel.Text = string.format("★%s★%s%s", ST.currentTrialFolder, ci, ST.trackerScanCount > 0 and string.format(" [#%d]", ST.trackerScanCount) or "")
+		UI.TrialTrackerLabel.TextColor3 = Color3.fromRGB(0,255,200)
+	else UI.TrialTrackerLabel.Text = "Tracker: Waiting..."; UI.TrialTrackerLabel.TextColor3 = Color3.fromRGB(255,150,255) end
+end
+local function updateTrialTimerDisplay()
+	if not UI.TrialDebugLabel then return end
+	local a,t = isTrialTimerActive(); if a then UI.TrialDebugLabel.Text = "Timer: "..t
+	else local o,c = isTrialOnCooldown(); if o then UI.TrialDebugLabel.Text = "CD: "..c else UI.TrialDebugLabel.Text = "Timer: Ready" end end
+end
+
+local function trackerRescanAtTower()
+	task.wait(0.5); local nr,nc,_,di = scanWithRetry(4,0.3)
+	if not nr then task.wait(0.5); nr,nc,_,di = scanWithRetry(3,0.5); if not nr then return nil,nil,"completed",di end end
+	local nf = matchRarityToFolder(nr); if not nf then return nr,nc,"no_folder",di end
+	ST.lastScanResult=nr; ST.lastScanFolder=nf
+	if ST.currentTrialRarity and nr ~= ST.currentTrialRarity then ST.previousTrialRarity=ST.currentTrialRarity; ST.currentTrialRarity=nr; ST.currentTrialFolder=nf; ST.rarityChangeCount=ST.rarityChangeCount+1; autoSelectTrialRarity(nf); return nr,nc,"changed",di end
+	ST.currentTrialRarity=nr; ST.currentTrialFolder=nf; return nr,nc,"same",di
+end
+
+local function startContinuousTracker()
+	if ST.continuousTrackerRunning then return end; ST.continuousTrackerRunning=true; ST.trackerScanCount=0
+	task.spawn(function()
+		while ST.autoTrialEnabled and ST.continuousTrackerRunning do
+			if ST.trialInProgress and ST.trialCollecting and ST.currentTrialRarity then
+				ST.trackerScanCount=ST.trackerScanCount+1; local nr,nc = scanTrialFromBillboard()
+				if nr then local nf = matchRarityToFolder(nr)
+					if nf and ST.currentTrialRarity and nr ~= ST.currentTrialRarity then
+						ST.previousTrialRarity=ST.currentTrialRarity; ST.currentTrialRarity=nr; ST.currentTrialFolder=nf
+						ST.rarityChangeCount=ST.rarityChangeCount+1; ST.trialRequired=nc or 1; autoSelectTrialRarity(nf) end
+					ST.lastScanResult=nr; ST.lastScanFolder=nf end
+				updateTrackerLabel(); updateTrialTimerDisplay() end
+			checkMapChange()
+			for i=1,math.floor(CFG.TRACKER_INTERVAL/0.5) do if not ST.autoTrialEnabled or not ST.continuousTrackerRunning then break end; task.wait(0.5) end
+		end; ST.continuousTrackerRunning=false end)
+end
+local function stopContinuousTracker() ST.continuousTrackerRunning=false end
+
+--// ===================== TSUNAMI ===================== --
+local function getTsunamiParts() local p={}; if not CFG.TSUNAMI_PATH or not CFG.TSUNAMI_PATH.Parent then return p end; for _,o in pairs(CFG.TSUNAMI_PATH:GetDescendants()) do if o:IsA("BasePart") then table.insert(p,o) end end; return p end
+local function getClosestWaveDistance(pos) local cl=math.huge; for _,p in pairs(getTsunamiParts()) do if p and p.Parent then local d=(p.Position-pos).Magnitude; if d<cl then cl=d end end end; return cl end
+local function isWaveNearby(pos, sd) return getClosestWaveDistance(pos) < (sd or CFG.WAVE_SAFE_DISTANCE) end
+local function isWaveApproaching(tp, cr) cr=cr or CFG.WAVE_SAFE_DISTANCE*1.5; for _,p in pairs(getTsunamiParts()) do if p and p.Parent and (p.Position-tp).Magnitude<cr then return true end end; return false end
+local function waitForWavesToClear(tp, cb)
+	local st=tick(); while true do if not isWaveApproaching(tp,CFG.WAVE_SAFE_DISTANCE) then return true end
+		if tick()-st>CFG.WAVE_MAX_WAIT then return true end; if cb then cb("Wave nearby...") end; task.wait(CFG.WAVE_CHECK_INTERVAL)
+		if not ST.running and not ST.autoTrialRunning and not ST.returning then return false end end
+end
+
+local function saveCurrentPosition() if rootPart and rootPart.Parent then ST.savedCFrame=rootPart.CFrame; ST.savedPosition=rootPart.Position; return true end; return false end
+
+--// ===================== PHYSICS ===================== --
+local function lockPhysics()
+	if ST.physicsLocked then return end; if not rootPart or not rootPart.Parent then return end; ST.physicsLocked=true
+	ST.savedWalkSpeed=humanoid.WalkSpeed; ST.savedJumpPower=humanoid.JumpPower; humanoid.WalkSpeed=0; humanoid.JumpPower=0
+	pcall(function() humanoid.JumpHeight=0 end)
+	for _,s in ipairs({Enum.HumanoidStateType.Swimming,Enum.HumanoidStateType.Freefall,Enum.HumanoidStateType.FallingDown,Enum.HumanoidStateType.Ragdoll,Enum.HumanoidStateType.GettingUp,Enum.HumanoidStateType.Jumping,Enum.HumanoidStateType.Landed,Enum.HumanoidStateType.Climbing}) do pcall(function() humanoid:SetStateEnabled(s,false) end) end
+	pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Physics) end)
+	for _,o in pairs(rootPart:GetChildren()) do if o.Name=="_BrainLock" then o:Destroy() end end
+	ST.bodyVel=Instance.new("BodyVelocity"); ST.bodyVel.Name="_BrainLock"; ST.bodyVel.Velocity=Vector3.zero; ST.bodyVel.MaxForce=Vector3.new(1e9,1e9,1e9); ST.bodyVel.P=1e9; ST.bodyVel.Parent=rootPart
+	ST.bodyGyro=Instance.new("BodyGyro"); ST.bodyGyro.Name="_BrainLock"; ST.bodyGyro.CFrame=rootPart.CFrame; ST.bodyGyro.MaxTorque=Vector3.new(1e9,1e9,1e9); ST.bodyGyro.P=1e9; ST.bodyGyro.Parent=rootPart
+	if ST.frameConn then ST.frameConn:Disconnect() end
+	ST.frameConn=RunService.Heartbeat:Connect(function() if not rootPart or not rootPart.Parent then return end
+		rootPart.Velocity=Vector3.zero; rootPart.AssemblyLinearVelocity=Vector3.zero; rootPart.AssemblyAngularVelocity=Vector3.zero
+		if ST.bodyGyro and ST.bodyGyro.Parent then ST.bodyGyro.CFrame=rootPart.CFrame end end)
+end
+local function unlockPhysics()
+	ST.physicsLocked=false; if ST.frameConn then ST.frameConn:Disconnect(); ST.frameConn=nil end
+	if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel:Destroy() end; if ST.bodyGyro and ST.bodyGyro.Parent then ST.bodyGyro:Destroy() end; ST.bodyVel=nil; ST.bodyGyro=nil
+	if rootPart and rootPart.Parent then for _,o in pairs(rootPart:GetChildren()) do if o.Name=="_BrainLock" then o:Destroy() end end end
+	if humanoid then humanoid.WalkSpeed=ST.savedWalkSpeed; humanoid.JumpPower=ST.savedJumpPower; pcall(function() humanoid.JumpHeight=7.2 end)
+		for _,s in ipairs({Enum.HumanoidStateType.Swimming,Enum.HumanoidStateType.Freefall,Enum.HumanoidStateType.FallingDown,Enum.HumanoidStateType.Ragdoll,Enum.HumanoidStateType.GettingUp,Enum.HumanoidStateType.Jumping,Enum.HumanoidStateType.Landed,Enum.HumanoidStateType.Climbing,Enum.HumanoidStateType.Running}) do pcall(function() humanoid:SetStateEnabled(s,true) end) end
+		pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Running) end) end
+end
+
+--// ===================== TWEEN ===================== --
+local function smoothTween(targetCFrame, speed)
+	if not rootPart or not rootPart.Parent then return false end
+	-- Allow tween if running, returning, or trial active
+	if not ST.running and not ST.autoTrialEnabled and not ST.returning then return false end
+	local distance = (rootPart.Position - targetCFrame.Position).Magnitude
+	if distance < 1 then rootPart.CFrame = targetCFrame; return true end
+	local tweenTime = math.max(distance / speed, 0.05)
+	if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce = Vector3.zero end
+	rootPart.Velocity = Vector3.zero; rootPart.AssemblyLinearVelocity = Vector3.zero; rootPart.AssemblyAngularVelocity = Vector3.zero
+	local guard = RunService.Heartbeat:Connect(function()
+		if not rootPart or not rootPart.Parent then return end
+		rootPart.Velocity = Vector3.zero; rootPart.AssemblyLinearVelocity = Vector3.zero; rootPart.AssemblyAngularVelocity = Vector3.zero
+		pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Physics) end) end)
+	ST.currentTween = TweenService:Create(rootPart, TweenInfo.new(tweenTime, Enum.EasingStyle.Linear), {CFrame = targetCFrame})
+	ST.tweening = true; ST.currentTween:Play(); ST.currentTween.Completed:Wait(); ST.tweening = false; guard:Disconnect()
+	rootPart.CFrame = targetCFrame; rootPart.Velocity = Vector3.zero; rootPart.AssemblyLinearVelocity = Vector3.zero; rootPart.AssemblyAngularVelocity = Vector3.zero
+	if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.Velocity = Vector3.zero; ST.bodyVel.MaxForce = Vector3.new(1e9,1e9,1e9) end; return true
+end
+local function stopTween()
+	if ST.currentTween then ST.currentTween:Cancel(); ST.currentTween = nil; ST.tweening = false end
+	if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.Velocity = Vector3.zero; ST.bodyVel.MaxForce = Vector3.new(1e9,1e9,1e9) end
+	if rootPart and rootPart.Parent then rootPart.Velocity = Vector3.zero; rootPart.AssemblyLinearVelocity = Vector3.zero; rootPart.AssemblyAngularVelocity = Vector3.zero end
+end
+
+local function enableNoclip() if ST.noclipConnection then return end; ST.noclipEnabled=true
+	ST.noclipConnection=RunService.Stepped:Connect(function() if not character or not character.Parent then return end; for _,p in pairs(character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide=false end end end) end
+local function disableNoclip() ST.noclipEnabled=false; if ST.noclipConnection then ST.noclipConnection:Disconnect(); ST.noclipConnection=nil end end
+
+--// ===================== SMOOTH RETURN (underground) ===================== --
+local function smoothReturnToSaved()
+	if not ST.savedCFrame or not rootPart or not rootPart.Parent then return false end
+	ST.returning = true
+	enableNoclip(); lockPhysics()
+	if UI.PhaseLabel then UI.PhaseLabel.Text = "Returning: Diving..." end
+	-- Step 1: Dive down to travel depth
+	smoothTween(CFrame.new(rootPart.Position.X, rootPart.Position.Y + CFG.TRAVEL_DEPTH, rootPart.Position.Z), CFG.DIVE_SPEED)
+	task.wait(0.05)
+	if not ST.returning then ST.returning = false; return false end
+	-- Step 2: Travel underground to saved position
+	if UI.PhaseLabel then UI.PhaseLabel.Text = "Returning: Underground..." end
+	smoothTween(CFrame.new(ST.savedCFrame.Position.X, ST.savedCFrame.Position.Y + CFG.TRAVEL_DEPTH, ST.savedCFrame.Position.Z), CFG.TWEEN_SPEED)
+	task.wait(0.05)
+	if not ST.returning then ST.returning = false; return false end
+	-- Step 3: Wait for waves at destination
+	waitForWavesToClear(ST.savedCFrame.Position, function(m) if UI.PhaseLabel then UI.PhaseLabel.Text = m end end)
+	-- Step 4: Rise up to saved position
+	if UI.PhaseLabel then UI.PhaseLabel.Text = "Returning: Rising..." end
+	smoothTween(ST.savedCFrame, CFG.RISE_SPEED)
+	task.wait(0.1)
+	ST.returning = false
+	return true
+end
+
+--// ===================== PROMPTS ===================== --
+local function fireProximityPrompt(prompt)
+	if not prompt or not prompt:IsA("ProximityPrompt") then return end
+	local oh,od,oe,ox = prompt.HoldDuration, prompt.MaxActivationDistance, prompt.Enabled, prompt.Exclusivity
+	prompt.HoldDuration=0; prompt.MaxActivationDistance=CFG.PROMPT_OVERRIDE_DISTANCE; prompt.Enabled=true; prompt.Exclusivity=Enum.ProximityPromptExclusivity.AlwaysShow
+	prompt:InputHoldBegin(); prompt:InputHoldEnd()
+	task.delay(0.1, function() if prompt and prompt.Parent then prompt.HoldDuration=oh; prompt.MaxActivationDistance=od; prompt.Enabled=oe; prompt.Exclusivity=ox end end)
+end
+local function grabAllPrompts(obj) if not obj or not obj.Parent then return 0 end; local c=0
+	if obj:IsA("ProximityPrompt") then fireProximityPrompt(obj); c+=1 end
+	for _,d in pairs(obj:GetDescendants()) do if d:IsA("ProximityPrompt") then fireProximityPrompt(d); c+=1 end end
+	if obj.Parent then for _,ch in pairs(obj.Parent:GetChildren()) do if ch:IsA("ProximityPrompt") then fireProximityPrompt(ch); c+=1 end end end; return c end
+local function grabNearbyPrompts(pos, rad) rad=rad or 20; local c=0
+	for _,d in pairs(workspace:GetDescendants()) do if d:IsA("ProximityPrompt") then local p=d.Parent; if p and p:IsA("BasePart") and (p.Position-pos).Magnitude<=rad then fireProximityPrompt(d); c+=1 end end end; return c end
+local function enableAutoInstantPrompts() ST.autoInstantEnabled=true
+	for _,d in pairs(workspace:GetDescendants()) do if d:IsA("ProximityPrompt") then d.HoldDuration=0; d.MaxActivationDistance=math.max(d.MaxActivationDistance,15) end end
+	ST.promptConnections[#ST.promptConnections+1]=workspace.DescendantAdded:Connect(function(d) if ST.autoInstantEnabled and d:IsA("ProximityPrompt") then task.wait(); d.HoldDuration=0; d.MaxActivationDistance=math.max(d.MaxActivationDistance,15) end end) end
+local function disableAutoInstantPrompts() ST.autoInstantEnabled=false; for _,c in pairs(ST.promptConnections) do c:Disconnect() end; ST.promptConnections={} end
+
+local function refreshChar()
+	if not character or not character.Parent then character=player.Character or player.CharacterAdded:Wait(); humanoid=character:WaitForChild("Humanoid"); rootPart=character:WaitForChild("HumanoidRootPart"); task.wait(0.3); enableNoclip(); lockPhysics() end
+	if not ST.bodyVel or not ST.bodyVel.Parent or not ST.bodyGyro or not ST.bodyGyro.Parent then lockPhysics() end end
+
+local function travelToTower()
+	refreshChar(); enableNoclip(); lockPhysics()
+	smoothTween(CFrame.new(rootPart.Position.X, rootPart.Position.Y+CFG.TRAVEL_DEPTH, rootPart.Position.Z), CFG.DIVE_SPEED); task.wait(0.05)
+	smoothTween(CFrame.new(CFG.TOWER_POSITION.X, CFG.TOWER_POSITION.Y+CFG.TRAVEL_DEPTH, CFG.TOWER_POSITION.Z), CFG.TWEEN_SPEED); task.wait(0.05)
+	smoothTween(CFrame.new(CFG.TOWER_POSITION.X, CFG.TOWER_POSITION.Y+CFG.GRAB_HEIGHT, CFG.TOWER_POSITION.Z), CFG.RISE_SPEED); task.wait(0.15)
+	rootPart.CFrame=CFG.TOWER_CFRAME*CFrame.new(0,3,4); rootPart.Velocity=Vector3.zero; rootPart.AssemblyLinearVelocity=Vector3.zero; task.wait(0.1); return true end
+local function fireTrialPrompt() local p=getProximityPrompt(); if not p then return false end
+	rootPart.CFrame=CFG.TOWER_CFRAME*CFrame.new(0,3,4); rootPart.Velocity=Vector3.zero; task.wait(0.1)
+	fireProximityPrompt(p); task.wait(0.3); fireProximityPrompt(p); task.wait(0.2); return true end
+
+--// ===================== TARGETS ===================== --
+local function scanRarityFolders() local f={}; for _,c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if c:IsA("Folder") or c:IsA("Model") then table.insert(f,c.Name) end end; table.sort(f); return f end
+local function getBrainrots(sel) local b={}; for _,rn in pairs(sel) do local fo=CFG.BRAINROT_PATH:FindFirstChild(rn)
+	if fo then for _,br in pairs(fo:GetChildren()) do local p=br:IsA("Model") and (br.PrimaryPart or br:FindFirstChildWhichIsA("BasePart")) or (br:IsA("BasePart") and br or nil)
+		if p then table.insert(b,{Name=br.Name,Rarity=rn,Part=p,Object=br}) end end end end; return b end
+local function scanLuckyBlockRarities() local r,s={},{}; for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do local ra=c.Name:match("_(%w+)$"); if ra and not s[ra] then s[ra]=true; table.insert(r,ra) end end; table.sort(r); return r end
+local function getLuckyBlockRarityCount(ra) local c=0; for _,ch in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do if ch.Name:match("_(%w+)$")==ra then c+=1 end end; return c end
+local function getLuckyBlocks(selR) local b={}; for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do local r=c.Name:match("_(%w+)$"); if r and selR[r] then
+	local p=c:IsA("Model") and (c.PrimaryPart or c:FindFirstChildWhichIsA("BasePart")) or (c:IsA("BasePart") and c or nil); if p then table.insert(b,{Name=c.Name,Rarity=r,Part=p,Object=c}) end end end; return b end
+local function hasSelectedRarities(tab) tab=tab or ST.activeTab
+	if tab=="Brainrot" then for _ in pairs(ST.brainrotSelectedRarities) do return true end else for _ in pairs(ST.luckyBlockSelectedRarities) do return true end end; return false end
+local function getTargets(tab) tab=tab or ST.activeTab
+	if tab=="Brainrot" then local s={}; for n in pairs(ST.brainrotSelectedRarities) do table.insert(s,n) end; return #s>0 and getBrainrots(s) or {} else return getLuckyBlocks(ST.luckyBlockSelectedRarities) end end
+
+--// ===================== INSTANT STOP + SMOOTH RETURN ===================== --
+local function instantStopAndReturn()
+	-- 1. Kill all running states
+	local wasRunning = ST.running or ST.autoTrialRunning
+	ST.running = false; ST.autoTrialEnabled = false; ST.autoTrialRunning = false
+	ST.trialInProgress = false; ST.trialCollecting = false
+
+	-- 2. Cancel current tween INSTANTLY
+	stopTween()
+	stopContinuousTracker()
+	resetRarityTracker()
+	restorePreviousSelections()
+
+	-- 3. Freeze character in place
+	if rootPart and rootPart.Parent then
+		rootPart.Velocity = Vector3.zero; rootPart.AssemblyLinearVelocity = Vector3.zero; rootPart.AssemblyAngularVelocity = Vector3.zero
+	end
+
+	-- 4. Update button immediately
+	if UI.ToggleBtn then UI.ToggleBtn.Text = "RETURNING..."; UI.ToggleBtn.BackgroundColor3 = Color3.fromRGB(200,160,0) end
+	if UI.StatusLabel then UI.StatusLabel.Text = "Returning..." end
+	if UI.TrialStatusLabel then UI.TrialStatusLabel.Text = "Trial: OFF"; UI.TrialStatusLabel.TextColor3 = Color3.fromRGB(180,180,180) end
+	if ST.savedTrialTab then switchTab(ST.savedTrialTab); ST.savedTrialTab = nil end
+
+	-- 5. Smooth return underground then cleanup
+	task.spawn(function()
+		if ST.savedCFrame and rootPart and rootPart.Parent then
+			smoothReturnToSaved()
+			task.wait(0.2)
+		end
+
+		-- 6. Full cleanup after return
+		ST.returning = false
+		unlockPhysics()
+		disableNoclip()
+		restoreFloors()
+		updateFloorLabel()
+
+		if UI.ToggleBtn then UI.ToggleBtn.Text = "START"; UI.ToggleBtn.BackgroundColor3 = Color3.fromRGB(40,140,40) end
+		if UI.StatusLabel then UI.StatusLabel.Text = "Stopped" end
+		if UI.PhaseLabel then UI.PhaseLabel.Text = "--" end
+		if UI.TrialCollectLabel then UI.TrialCollectLabel.Text = "Collecting: --"; UI.TrialCollectLabel.TextColor3 = Color3.fromRGB(255,255,0) end
+		if UI.TrialTrackerLabel then UI.TrialTrackerLabel.Text = "Tracker: Idle"; UI.TrialTrackerLabel.TextColor3 = Color3.fromRGB(255,150,255) end
+		if UI.TrialProgressLabel then UI.TrialProgressLabel.Text = "Progress: 0/0" end
+		if UI.TrialDebugLabel then UI.TrialDebugLabel.Text = "Debug: --" end
+	end)
+end
+
+--// ===================== GUI ===================== --
+local ScreenGui = Instance.new("ScreenGui"); ScreenGui.Name="BrainrotTP"; ScreenGui.ResetOnSpawn=false; ScreenGui.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+pcall(function() ScreenGui.Parent=game:GetService("CoreGui") end); if not ScreenGui.Parent then ScreenGui.Parent=player:WaitForChild("PlayerGui") end
+local guiWidth=isMobile and 200 or 310; local guiHeight=isMobile and 400 or 720; local fontSize=isMobile and 8 or 12
+local btnHeight=isMobile and 26 or 34; local checkHeight=isMobile and 24 or 32; local sliderH=isMobile and 8 or 10; local toggleH=isMobile and 22 or 28; local dragH=isMobile and 30 or 40
+
+local MainFrame=Instance.new("Frame"); MainFrame.Name="MainFrame"; MainFrame.Size=UDim2.new(0,guiWidth,0,guiHeight)
+MainFrame.Position=UDim2.new(0.5,-guiWidth/2,0.5,-guiHeight/2); MainFrame.BackgroundColor3=Color3.fromRGB(25,25,35); MainFrame.BorderSizePixel=0; MainFrame.Active=true; MainFrame.Parent=ScreenGui
+Instance.new("UICorner",MainFrame).CornerRadius=UDim.new(0,10)
+local uiStroke=Instance.new("UIStroke",MainFrame); uiStroke.Color=Color3.fromRGB(100,60,200); uiStroke.Thickness=2
+local dragBar=Instance.new("Frame"); dragBar.Size=UDim2.new(1,0,0,dragH); dragBar.BackgroundColor3=Color3.fromRGB(40,20,80); dragBar.BorderSizePixel=0; dragBar.Parent=MainFrame
+Instance.new("UICorner",dragBar).CornerRadius=UDim.new(0,10)
+do local da,ds,sp=false,nil,nil
+	dragBar.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then da=true;ds=i.Position;sp=MainFrame.Position end end)
+	UserInputService.InputChanged:Connect(function(i) if da and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then local d=i.Position-ds;MainFrame.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y) end end)
+	UserInputService.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then da=false end end) end
+local Title=Instance.new("TextLabel"); Title.Size=UDim2.new(1,-80,1,0); Title.Position=UDim2.new(0,10,0,0); Title.BackgroundTransparency=1; Title.Text="Brainrot TP"
+Title.TextColor3=Color3.new(1,1,1); Title.TextSize=isMobile and 11 or 16; Title.Font=Enum.Font.GothamBold; Title.TextXAlignment=Enum.TextXAlignment.Left; Title.Parent=dragBar
+
+do local mw=isMobile and 26 or 34; local mh=isMobile and 20 or 28
+	local MinBtn=Instance.new("TextButton"); MinBtn.Size=UDim2.new(0,mw,0,mh); MinBtn.Position=UDim2.new(1,-(mw*2+4),0,isMobile and 5 or 6)
+	MinBtn.BackgroundColor3=Color3.fromRGB(60,60,100); MinBtn.BorderSizePixel=0; MinBtn.Text="_"; MinBtn.TextColor3=Color3.new(1,1,1); MinBtn.TextSize=isMobile and 12 or 16; MinBtn.Font=Enum.Font.GothamBold; MinBtn.Parent=dragBar; Instance.new("UICorner",MinBtn).CornerRadius=UDim.new(0,6)
+	local CloseBtn=Instance.new("TextButton"); CloseBtn.Size=UDim2.new(0,mw,0,mh); CloseBtn.Position=UDim2.new(1,-(mw+2),0,isMobile and 5 or 6)
+	CloseBtn.BackgroundColor3=Color3.fromRGB(160,30,30); CloseBtn.BorderSizePixel=0; CloseBtn.Text="X"; CloseBtn.TextColor3=Color3.new(1,1,1); CloseBtn.TextSize=isMobile and 10 or 14; CloseBtn.Font=Enum.Font.GothamBold; CloseBtn.Parent=dragBar; Instance.new("UICorner",CloseBtn).CornerRadius=UDim.new(0,6)
+	UI.contentFrame=Instance.new("ScrollingFrame"); UI.contentFrame.Name="Content"; UI.contentFrame.Size=UDim2.new(1,0,1,-dragH); UI.contentFrame.Position=UDim2.new(0,0,0,dragH)
+	UI.contentFrame.BackgroundTransparency=1; UI.contentFrame.BorderSizePixel=0; UI.contentFrame.ScrollBarThickness=isMobile and 3 or 4; UI.contentFrame.ScrollBarImageColor3=Color3.fromRGB(100,60,200)
+	UI.contentFrame.CanvasSize=UDim2.new(0,0,0,0); UI.contentFrame.ElasticBehavior=Enum.ElasticBehavior.Always; UI.contentFrame.ScrollingDirection=Enum.ScrollingDirection.Y; UI.contentFrame.Parent=MainFrame
+	MinBtn.MouseButton1Click:Connect(function() ST.minimized=not ST.minimized; UI.contentFrame.Visible=not ST.minimized
+		MainFrame.Size=ST.minimized and UDim2.new(0,guiWidth,0,dragH) or UDim2.new(0,guiWidth,0,guiHeight); MinBtn.Text=ST.minimized and "+" or "_" end)
+	CloseBtn.MouseButton1Click:Connect(function() ST.running=false; ST.autoTrialEnabled=false; ST.returning=false; stopTween(); restoreFloors(); unlockPhysics(); disableNoclip()
+		if ST.mapWatcherConnection then ST.mapWatcherConnection:Disconnect() end; ScreenGui:Destroy() end) end
+
+local contentFrame=UI.contentFrame; local yOff=4; local lh=isMobile and 11 or 16; local lhs=isMobile and 10 or 14; local lhx=isMobile and 9 or 12
+local function makeLabel(text,h,col,fs) local l=Instance.new("TextLabel"); l.Size=UDim2.new(1,-16,0,h); l.Position=UDim2.new(0,8,0,yOff); l.BackgroundTransparency=1; l.Text=text; l.TextColor3=col or Color3.fromRGB(180,180,180); l.TextSize=fs or fontSize; l.Font=Enum.Font.Gotham; l.TextXAlignment=Enum.TextXAlignment.Left; l.TextWrapped=true; l.Parent=contentFrame; yOff=yOff+h+2; return l end
+
+UI.StatusLabel=makeLabel("Status: Idle",lh,Color3.fromRGB(180,180,180))
+UI.PhaseLabel=makeLabel("Phase: --",lhs,Color3.fromRGB(100,180,255),fontSize-1)
+UI.WaveLabel=makeLabel("Waves: Safe",lhs,Color3.fromRGB(100,255,100),fontSize-1)
+UI.GrabLabel=makeLabel("Grabbed: 0",lhs,Color3.fromRGB(100,255,100))
+UI.FloorLabel=makeLabel("Floors: Scanning...",lhs,Color3.fromRGB(255,160,60),fontSize-1)
+makeLabel("═══ TRIAL ═══",lh,Color3.fromRGB(0,200,255))
+UI.TrialStatusLabel=makeLabel("Trial: OFF",lh,Color3.fromRGB(180,180,180))
+UI.TrialDetailLabel=makeLabel("Requirement: --",lhs,Color3.fromRGB(0,200,255),fontSize-1)
+UI.TrialCollectLabel=makeLabel("Collecting: --",lhs,Color3.fromRGB(255,255,0),fontSize-1)
+UI.TrialTrackerLabel=makeLabel("Tracker: Idle",lhs,Color3.fromRGB(255,150,255),fontSize-1)
+UI.TrialProgressLabel=makeLabel("Progress: 0/0",lhs,Color3.fromRGB(0,255,100),fontSize-1)
+UI.TrialDebugLabel=makeLabel("Debug: --",lhx,Color3.fromRGB(120,120,150),fontSize-2)
+UI.SavedPosLabel=makeLabel("Saved Pos: None",lhx,Color3.fromRGB(255,180,80),fontSize-2)
+
+local function updateSavedPosLabel() if ST.savedCFrame then local p=ST.savedCFrame.Position; UI.SavedPosLabel.Text=string.format("Saved: X:%.0f Y:%.0f Z:%.0f",p.X,p.Y,p.Z); UI.SavedPosLabel.TextColor3=Color3.fromRGB(100,255,180) else UI.SavedPosLabel.Text="Saved Pos: None"; UI.SavedPosLabel.TextColor3=Color3.fromRGB(255,180,80) end end
+local function updateWaveStatus(pos) local d=getClosestWaveDistance(pos or (rootPart and rootPart.Position or Vector3.zero))
+	if d<CFG.WAVE_SAFE_DISTANCE then UI.WaveLabel.Text=string.format("WAVE! (%.0f)",d); UI.WaveLabel.TextColor3=Color3.fromRGB(255,60,60)
+	elseif d<CFG.WAVE_SAFE_DISTANCE*2 then UI.WaveLabel.Text=string.format("Wave near (%.0f)",d); UI.WaveLabel.TextColor3=Color3.fromRGB(255,200,60)
+	else UI.WaveLabel.Text="Waves: Safe"; UI.WaveLabel.TextColor3=Color3.fromRGB(100,255,100) end end
+
+local switchTab
+do local tf=Instance.new("Frame"); tf.Size=UDim2.new(1,-16,0,isMobile and 22 or 30); tf.Position=UDim2.new(0,8,0,yOff); tf.BackgroundColor3=Color3.fromRGB(18,18,28); tf.BorderSizePixel=0; tf.Parent=contentFrame; Instance.new("UICorner",tf).CornerRadius=UDim.new(0,6); yOff=yOff+(isMobile and 25 or 33)
+	UI.brainrotTabBtn=Instance.new("TextButton"); UI.brainrotTabBtn.Size=UDim2.new(0.5,-3,1,-4); UI.brainrotTabBtn.Position=UDim2.new(0,2,0,2); UI.brainrotTabBtn.BackgroundColor3=Color3.fromRGB(100,60,200); UI.brainrotTabBtn.BorderSizePixel=0; UI.brainrotTabBtn.Text="Brainrot"; UI.brainrotTabBtn.TextColor3=Color3.new(1,1,1); UI.brainrotTabBtn.TextSize=isMobile and 9 or 13; UI.brainrotTabBtn.Font=Enum.Font.GothamBold; UI.brainrotTabBtn.Parent=tf; Instance.new("UICorner",UI.brainrotTabBtn).CornerRadius=UDim.new(0,6)
+	UI.luckyBlockTabBtn=Instance.new("TextButton"); UI.luckyBlockTabBtn.Size=UDim2.new(0.5,-3,1,-4); UI.luckyBlockTabBtn.Position=UDim2.new(0.5,1,0,2); UI.luckyBlockTabBtn.BackgroundColor3=Color3.fromRGB(40,40,60); UI.luckyBlockTabBtn.BorderSizePixel=0; UI.luckyBlockTabBtn.Text="Lucky Blocks"; UI.luckyBlockTabBtn.TextColor3=Color3.fromRGB(150,150,150); UI.luckyBlockTabBtn.TextSize=isMobile and 9 or 13; UI.luckyBlockTabBtn.Font=Enum.Font.GothamBold; UI.luckyBlockTabBtn.Parent=tf; Instance.new("UICorner",UI.luckyBlockTabBtn).CornerRadius=UDim.new(0,6) end
+
+local scrollH=isMobile and 60 or 120
+UI.BrainrotScrollFrame=Instance.new("ScrollingFrame"); UI.BrainrotScrollFrame.Size=UDim2.new(1,-16,0,scrollH); UI.BrainrotScrollFrame.Position=UDim2.new(0,8,0,yOff); UI.BrainrotScrollFrame.BackgroundColor3=Color3.fromRGB(18,18,28); UI.BrainrotScrollFrame.BorderSizePixel=0; UI.BrainrotScrollFrame.ScrollBarThickness=isMobile and 4 or 6; UI.BrainrotScrollFrame.ScrollBarImageColor3=Color3.fromRGB(100,60,200); UI.BrainrotScrollFrame.CanvasSize=UDim2.new(0,0,0,0); UI.BrainrotScrollFrame.ElasticBehavior=Enum.ElasticBehavior.Always; UI.BrainrotScrollFrame.ScrollingDirection=Enum.ScrollingDirection.Y; UI.BrainrotScrollFrame.Visible=true; UI.BrainrotScrollFrame.Parent=contentFrame; Instance.new("UICorner",UI.BrainrotScrollFrame).CornerRadius=UDim.new(0,6)
+do local l=Instance.new("UIListLayout",UI.BrainrotScrollFrame); l.Padding=UDim.new(0,isMobile and 2 or 3); l.SortOrder=Enum.SortOrder.LayoutOrder end
+do local p=Instance.new("UIPadding",UI.BrainrotScrollFrame); p.PaddingTop=UDim.new(0,3); p.PaddingLeft=UDim.new(0,3); p.PaddingRight=UDim.new(0,3) end
+UI.LuckyBlockScrollFrame=Instance.new("ScrollingFrame"); UI.LuckyBlockScrollFrame.Size=UDim2.new(1,-16,0,scrollH); UI.LuckyBlockScrollFrame.Position=UDim2.new(0,8,0,yOff); UI.LuckyBlockScrollFrame.BackgroundColor3=Color3.fromRGB(18,18,28); UI.LuckyBlockScrollFrame.BorderSizePixel=0; UI.LuckyBlockScrollFrame.ScrollBarThickness=isMobile and 4 or 6; UI.LuckyBlockScrollFrame.ScrollBarImageColor3=Color3.fromRGB(200,160,0); UI.LuckyBlockScrollFrame.CanvasSize=UDim2.new(0,0,0,0); UI.LuckyBlockScrollFrame.ElasticBehavior=Enum.ElasticBehavior.Always; UI.LuckyBlockScrollFrame.ScrollingDirection=Enum.ScrollingDirection.Y; UI.LuckyBlockScrollFrame.Visible=false; UI.LuckyBlockScrollFrame.Parent=contentFrame; Instance.new("UICorner",UI.LuckyBlockScrollFrame).CornerRadius=UDim.new(0,6)
+do local l=Instance.new("UIListLayout",UI.LuckyBlockScrollFrame); l.Padding=UDim.new(0,isMobile and 2 or 3); l.SortOrder=Enum.SortOrder.LayoutOrder end
+do local p=Instance.new("UIPadding",UI.LuckyBlockScrollFrame); p.PaddingTop=UDim.new(0,3); p.PaddingLeft=UDim.new(0,3); p.PaddingRight=UDim.new(0,3) end
+yOff=yOff+scrollH+4
+
+switchTab=function(tab) ST.activeTab=tab
+	if tab=="Brainrot" then UI.brainrotTabBtn.BackgroundColor3=Color3.fromRGB(100,60,200); UI.brainrotTabBtn.TextColor3=Color3.new(1,1,1); UI.luckyBlockTabBtn.BackgroundColor3=Color3.fromRGB(40,40,60); UI.luckyBlockTabBtn.TextColor3=Color3.fromRGB(150,150,150); UI.BrainrotScrollFrame.Visible=true; UI.LuckyBlockScrollFrame.Visible=false; Title.Text="Brainrot TP"; uiStroke.Color=Color3.fromRGB(100,60,200)
+	else UI.brainrotTabBtn.BackgroundColor3=Color3.fromRGB(40,40,60); UI.brainrotTabBtn.TextColor3=Color3.fromRGB(150,150,150); UI.luckyBlockTabBtn.BackgroundColor3=Color3.fromRGB(200,160,0); UI.luckyBlockTabBtn.TextColor3=Color3.new(1,1,1); UI.BrainrotScrollFrame.Visible=false; UI.LuckyBlockScrollFrame.Visible=true; Title.Text="Lucky Block TP"; uiStroke.Color=Color3.fromRGB(200,160,0) end end
+UI.brainrotTabBtn.MouseButton1Click:Connect(function() switchTab("Brainrot") end); UI.luckyBlockTabBtn.MouseButton1Click:Connect(function() switchTab("LuckyBlocks") end)
+
+local RARITY_ORDER_C={{"uncommon",Color3.fromRGB(80,200,80)},{"common",Color3.fromRGB(180,180,180)},{"rare",Color3.fromRGB(60,120,255)},{"epic",Color3.fromRGB(180,60,255)},{"legendary",Color3.fromRGB(255,180,0)},{"mythic",Color3.fromRGB(255,50,50)},{"secret",Color3.fromRGB(255,0,100)},{"divine",Color3.fromRGB(255,220,100)}}
+local function getRarityColor(n) local l=string.lower(n); for _,p in ipairs(RARITY_ORDER_C) do if string.find(l,p[1]) then return p[2] end end; return Color3.fromRGB(200,200,200) end
+
+local function createBrainrotCheckbox(rn,idx)
+	local btn=Instance.new("TextButton"); btn.Size=UDim2.new(1,-6,0,checkHeight); btn.BackgroundColor3=Color3.fromRGB(35,35,50); btn.BorderSizePixel=0; btn.Text=""; btn.LayoutOrder=idx; btn.Parent=UI.BrainrotScrollFrame; Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
+	local cks=checkHeight-(isMobile and 6 or 8); local ck=Instance.new("TextLabel"); ck.Size=UDim2.new(0,cks,0,cks); ck.Position=UDim2.new(0,4,0.5,-cks/2); ck.BackgroundColor3=Color3.fromRGB(50,50,70); ck.BorderSizePixel=0; ck.Text=""; ck.TextSize=isMobile and 10 or 14; ck.TextColor3=Color3.fromRGB(100,255,100); ck.Font=Enum.Font.GothamBold; ck.Parent=btn; Instance.new("UICorner",ck).CornerRadius=UDim.new(0,4)
+	local lb=Instance.new("TextLabel"); lb.Size=UDim2.new(1,-60,1,0); lb.Position=UDim2.new(0,checkHeight,0,0); lb.BackgroundTransparency=1; lb.Text=rn; lb.TextColor3=getRarityColor(rn); lb.TextSize=isMobile and 9 or 13; lb.Font=Enum.Font.GothamSemibold; lb.TextXAlignment=Enum.TextXAlignment.Left; lb.Parent=btn
+	local cl=Instance.new("TextLabel"); cl.Size=UDim2.new(0,26,1,0); cl.Position=UDim2.new(1,-28,0,0); cl.BackgroundTransparency=1; cl.TextColor3=Color3.fromRGB(140,140,140); cl.TextSize=isMobile and 8 or 11; cl.Font=Enum.Font.Gotham; cl.Parent=btn
+	local f=CFG.BRAINROT_PATH:FindFirstChild(rn); cl.Text=f and tostring(#f:GetChildren()) or "0"
+	btn.MouseButton1Click:Connect(function() if ST.brainrotSelectedRarities[rn] then ST.brainrotSelectedRarities[rn]=nil; ck.Text=""; ck.BackgroundColor3=Color3.fromRGB(50,50,70) else ST.brainrotSelectedRarities[rn]=true; ck.Text="Y"; ck.BackgroundColor3=Color3.fromRGB(40,100,40) end end)
+	ST.brainrotCheckboxes[rn]={Button=btn,Check=ck,CountLabel=cl,Label=lb} end
+local function createLuckyBlockCheckbox(rn,idx)
+	local btn=Instance.new("TextButton"); btn.Size=UDim2.new(1,-6,0,checkHeight); btn.BackgroundColor3=Color3.fromRGB(35,35,50); btn.BorderSizePixel=0; btn.Text=""; btn.LayoutOrder=idx; btn.Parent=UI.LuckyBlockScrollFrame; Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
+	local cks=checkHeight-(isMobile and 6 or 8); local ck=Instance.new("TextLabel"); ck.Size=UDim2.new(0,cks,0,cks); ck.Position=UDim2.new(0,4,0.5,-cks/2); ck.BackgroundColor3=Color3.fromRGB(50,50,70); ck.BorderSizePixel=0; ck.Text=""; ck.TextSize=isMobile and 10 or 14; ck.TextColor3=Color3.fromRGB(255,220,80); ck.Font=Enum.Font.GothamBold; ck.Parent=btn; Instance.new("UICorner",ck).CornerRadius=UDim.new(0,4)
+	local lb=Instance.new("TextLabel"); lb.Size=UDim2.new(1,-60,1,0); lb.Position=UDim2.new(0,checkHeight,0,0); lb.BackgroundTransparency=1; lb.Text=rn; lb.TextColor3=getRarityColor(rn); lb.TextSize=isMobile and 9 or 13; lb.Font=Enum.Font.GothamSemibold; lb.TextXAlignment=Enum.TextXAlignment.Left; lb.Parent=btn
+	local cl=Instance.new("TextLabel"); cl.Size=UDim2.new(0,26,1,0); cl.Position=UDim2.new(1,-28,0,0); cl.BackgroundTransparency=1; cl.TextColor3=Color3.fromRGB(140,140,140); cl.TextSize=isMobile and 8 or 11; cl.Font=Enum.Font.Gotham; cl.Parent=btn; cl.Text=tostring(getLuckyBlockRarityCount(rn))
+	btn.MouseButton1Click:Connect(function() if ST.luckyBlockSelectedRarities[rn] then ST.luckyBlockSelectedRarities[rn]=nil; ck.Text=""; ck.BackgroundColor3=Color3.fromRGB(50,50,70) else ST.luckyBlockSelectedRarities[rn]=true; ck.Text="Y"; ck.BackgroundColor3=Color3.fromRGB(100,80,0) end end)
+	ST.luckyBlockCheckboxes[rn]={Button=btn,Check=ck,CountLabel=cl} end
+
+local function createSlider(lt,mi,ma,def,cb)
+	local sl=Instance.new("TextLabel"); sl.Size=UDim2.new(1,-16,0,isMobile and 10 or 14); sl.Position=UDim2.new(0,8,0,yOff); sl.BackgroundTransparency=1; sl.Text=lt..": "..def; sl.TextColor3=Color3.fromRGB(180,180,180); sl.TextSize=fontSize-1; sl.Font=Enum.Font.Gotham; sl.TextXAlignment=Enum.TextXAlignment.Left; sl.Parent=contentFrame; yOff+=(isMobile and 11 or 15)
+	local bg=Instance.new("Frame"); bg.Size=UDim2.new(1,-16,0,sliderH); bg.Position=UDim2.new(0,8,0,yOff); bg.BackgroundColor3=Color3.fromRGB(40,40,55); bg.BorderSizePixel=0; bg.Parent=contentFrame; Instance.new("UICorner",bg).CornerRadius=UDim.new(1,0); yOff+=sliderH+(isMobile and 3 or 4)
+	local fl=Instance.new("Frame"); fl.Size=UDim2.new((def-mi)/(ma-mi),0,1,0); fl.BackgroundColor3=Color3.fromRGB(100,60,200); fl.BorderSizePixel=0; fl.Parent=bg; Instance.new("UICorner",fl).CornerRadius=UDim.new(1,0)
+	local thS=sliderH+(isMobile and 4 or 6); local th=Instance.new("Frame"); th.Size=UDim2.new(0,thS,0,thS); th.Position=UDim2.new((def-mi)/(ma-mi),-thS/2,0.5,-thS/2); th.BackgroundColor3=Color3.fromRGB(200,150,255); th.BorderSizePixel=0; th.ZIndex=2; th.Parent=bg; Instance.new("UICorner",th).CornerRadius=UDim.new(1,0)
+	local sd=false; local function us(i) local r=math.clamp((i.Position.X-bg.AbsolutePosition.X)/bg.AbsoluteSize.X,0,1); local v=math.floor(r*(ma-mi)+mi); fl.Size=UDim2.new(r,0,1,0); th.Position=UDim2.new(r,-thS/2,0.5,-thS/2); sl.Text=lt..": "..v; cb(v) end
+	bg.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then sd=true;us(i) end end)
+	th.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then sd=true end end)
+	UserInputService.InputChanged:Connect(function(i) if sd and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then us(i) end end)
+	UserInputService.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then sd=false end end) end
+createSlider("Speed",10,400,CFG.TWEEN_SPEED,function(v) CFG.TWEEN_SPEED=v end)
+createSlider("Depth",-200,-4,CFG.TRAVEL_DEPTH,function(v) CFG.TRAVEL_DEPTH=v end)
+createSlider("Grab H",0,20,CFG.GRAB_HEIGHT,function(v) CFG.GRAB_HEIGHT=v end)
+createSlider("Wave Safe",30,300,CFG.WAVE_SAFE_DISTANCE,function(v) CFG.WAVE_SAFE_DISTANCE=v end)
+
+local function createToggle(lt,def,col,cb)
+	local tBG=Instance.new("Frame"); tBG.Size=UDim2.new(1,-16,0,toggleH); tBG.Position=UDim2.new(0,8,0,yOff); tBG.BackgroundColor3=Color3.fromRGB(35,35,50); tBG.BorderSizePixel=0; tBG.Parent=contentFrame; Instance.new("UICorner",tBG).CornerRadius=UDim.new(0,6); yOff+=toggleH+(isMobile and 2 or 3)
+	local tL=Instance.new("TextLabel"); tL.Size=UDim2.new(1,-50,1,0); tL.Position=UDim2.new(0,6,0,0); tL.BackgroundTransparency=1; tL.Text=lt; tL.TextColor3=col; tL.TextSize=isMobile and 8 or 12; tL.Font=Enum.Font.GothamSemibold; tL.TextXAlignment=Enum.TextXAlignment.Left; tL.TextWrapped=true; tL.Parent=tBG
+	local tw=isMobile and 36 or 48; local th=toggleH-(isMobile and 6 or 10)
+	local tB=Instance.new("TextButton"); tB.Size=UDim2.new(0,tw,0,th); tB.Position=UDim2.new(1,-(tw+4),0.5,-th/2); tB.BackgroundColor3=def and Color3.fromRGB(40,160,40) or Color3.fromRGB(60,60,80); tB.BorderSizePixel=0; tB.Text=def and "ON" or "OFF"; tB.TextColor3=Color3.fromRGB(220,220,220); tB.TextSize=isMobile and 8 or 12; tB.Font=Enum.Font.GothamBold; tB.Parent=tBG; Instance.new("UICorner",tB).CornerRadius=UDim.new(1,0)
+	local st=def; tB.MouseButton1Click:Connect(function() st=not st; tB.Text=st and "ON" or "OFF"; tB.BackgroundColor3=st and Color3.fromRGB(40,160,40) or Color3.fromRGB(60,60,80); cb(st) end); return tB end
+
+createToggle("Instant Prompts",false,Color3.fromRGB(255,220,80),function(v) if v then enableAutoInstantPrompts() else disableAutoInstantPrompts() end end)
+createToggle("Auto Return",true,Color3.fromRGB(100,255,180),function(v) ST.autoReturnEnabled=v end)
+createToggle("Wave Safety",true,Color3.fromRGB(255,100,100),function(v) ST.waveCheckEnabled=v end)
+createToggle("Clear Floors",true,Color3.fromRGB(255,160,60),function(v) ST.floorClearEnabled=v; if not v then restoreFloors(); updateFloorLabel() end end)
+
+--// ===================== PICKUP ===================== --
+local function pickupOneBrainrot(target)
+	if not target.Part or not target.Part.Parent or not target.Object or not target.Object.Parent then return false end; refreshChar()
+	local tp=target.Part.CFrame.Position
+	smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED); task.wait(0.05)
+	if not ST.autoTrialEnabled then return false end
+	smoothTween(CFrame.new(tp.X,tp.Y+CFG.TRAVEL_DEPTH,tp.Z),CFG.TWEEN_SPEED); task.wait(0.05)
+	if not ST.autoTrialEnabled or not target.Part or not target.Part.Parent then return false end
+	local fp=target.Part.CFrame.Position
+	if ST.waveCheckEnabled and isWaveApproaching(fp,CFG.WAVE_SAFE_DISTANCE) then waitForWavesToClear(fp,function() end); if not ST.autoTrialEnabled or not target.Part or not target.Part.Parent then return false end; task.wait(0.2) end
+	if not target.Part or not target.Part.Parent then return false end; local fp2=target.Part.CFrame.Position
+	smoothTween(CFrame.new(fp2.X,fp2.Y+CFG.GRAB_HEIGHT,fp2.Z),CFG.RISE_SPEED)
+	if ST.waveCheckEnabled and isWaveNearby(rootPart.Position,CFG.WAVE_SAFE_DISTANCE*0.5) then smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED*2); task.wait(0.5); return false end
+	if target.Part and target.Part.Parent then if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce=Vector3.zero end
+		rootPart.CFrame=target.Part.CFrame*CFrame.new(0,2,0); rootPart.Velocity=Vector3.zero; rootPart.AssemblyLinearVelocity=Vector3.zero; task.wait(0.05)
+		if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce=Vector3.new(1e9,1e9,1e9); ST.bodyVel.Velocity=Vector3.zero end end
+	grabAllPrompts(target.Object); grabNearbyPrompts(tp,15)
+	pcall(function() for _,p in pairs(target.Object:GetDescendants()) do if p:IsA("BasePart") then firetouchinterest(rootPart,p,0); task.wait(); firetouchinterest(rootPart,p,1) end end
+		if target.Part and target.Part.Parent then firetouchinterest(rootPart,target.Part,0); task.wait(); firetouchinterest(rootPart,target.Part,1) end end)
+	pcall(function() for _,d in pairs(target.Object:GetDescendants()) do if d:IsA("ClickDetector") then fireclickdetector(d) end end end)
+	task.wait(CFG.WAIT_AT_TARGET); return true end
+
+--// ===================== TRIAL ===================== --
+local function doOneTrialRun()
+	ST.trialInProgress=true; ST.trialGrabbed=0; ST.trialCollecting=false; resetRarityTracker()
+	enableNoclip(); lockPhysics(); clearFloors(); updateFloorLabel(); saveCurrentSelections(); switchTab("Brainrot")
+	travelToTower(); task.wait(0.3); updateTrialTimerDisplay()
+	local onCd=isTrialOnCooldown(); if onCd then restorePreviousSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress=false; return false,"cooldown" end
+	if not isTrialTimerActive() then fireTrialPrompt(); task.wait(1.5); updateTrialTimerDisplay() end; task.wait(0.5)
+	local dr,dc,_,di=scanWithRetry(6,0.4)
+	if not dr then restorePreviousSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress=false; return false,"no_rarity" end
+	local fn=matchRarityToFolder(dr); if not fn then restorePreviousSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress=false; return false,"no_folder" end
+	ST.currentTrialRarity=dr; ST.currentTrialFolder=fn; ST.trialRequired=dc or 1; ST.trialCollecting=true; autoSelectTrialRarity(fn); updateTrackerLabel(); startContinuousTracker()
+	UI.TrialStatusLabel.Text=string.format("Need %d %s",ST.trialRequired,fn); UI.TrialStatusLabel.TextColor3=Color3.fromRGB(0,255,100)
+	local ts=tick()
+	while ST.autoTrialEnabled and (tick()-ts)<CFG.TRIAL_TIME_LIMIT do
+		refreshChar(); checkMapChange(); updateTrialTimerDisplay(); updateTrackerLabel()
+		local it=getBrainrots({ST.currentTrialFolder})
+		if #it==0 then task.wait(1.5); if not isTrialTimerActive() and not scanTrialFromBillboard() then
+			stopContinuousTracker(); restorePreviousSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress=false; ST.trialCollecting=false; return true,"completed" end; continue end
+		local bc,at=0,0
+		while bc<CFG.TRIAL_BATCH_SIZE and at<CFG.TRIAL_BATCH_SIZE+2 do at+=1
+			if not ST.autoTrialEnabled or (tick()-ts)>=CFG.TRIAL_TIME_LIMIT then break end; refreshChar()
+			local bt=getBrainrots({ST.currentTrialFolder}); if #bt==0 then break end
+			local tg=nil; for _,t in ipairs(bt) do if t.Part and t.Part.Parent and t.Object and t.Object.Parent then tg=t; break end end; if not tg then break end
+			if pickupOneBrainrot(tg) then bc+=1; ST.trialGrabbed+=1; ST.totalGrabbed+=1; UI.GrabLabel.Text="Grabbed: "..ST.totalGrabbed end
+			if not ST.autoTrialEnabled then break end; task.wait(0.1) end
+		if bc>0 then travelToTower(); task.wait(0.2)
+			for dn=1,bc+1 do fireTrialPrompt(); task.wait(0.3); if not ST.autoTrialEnabled then break end end
+			if not ST.autoTrialEnabled then break end
+			local nr,nc,ss=trackerRescanAtTower()
+			if ss=="completed" then stopContinuousTracker(); restorePreviousSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress=false; ST.trialCollecting=false; return true,"completed"
+			elseif ss=="changed" then updateTrackerLabel(); task.wait(0.3) elseif ss=="same" then ST.trialRequired=nc or 1; updateTrackerLabel() end
+		else task.wait(0.5) end
+		if not ST.autoTrialEnabled then break end; task.wait(0.2) end
+	stopContinuousTracker(); restorePreviousSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress=false; ST.trialCollecting=false; return true,"timeout"
+end
+
+local function startAutoTrialLoop()
+	if ST.autoTrialRunning then return end; ST.autoTrialEnabled=true; ST.autoTrialRunning=true
+	if not ST.savedCFrame then saveCurrentPosition(); updateSavedPosLabel() end
+	UI.TrialStatusLabel.Text="Trial: ACTIVE"; UI.TrialStatusLabel.TextColor3=Color3.fromRGB(0,200,255)
+	task.spawn(function() enableNoclip(); lockPhysics()
+		while ST.autoTrialEnabled do
+			local wf=ST.running; if wf then ST.running=false; stopTween(); task.wait(0.5) end
+			doOneTrialRun(); stopContinuousTracker(); restoreFloors(); updateFloorLabel()
+			if ST.savedCFrame and ST.autoTrialEnabled then ST.returning=true; smoothReturnToSaved(); ST.returning=false; task.wait(0.3) end
+			if ST.savedTrialTab and ST.autoTrialEnabled then switchTab(ST.savedTrialTab) end
+			if wf and ST.autoTrialEnabled then ST.running=true end; if not ST.autoTrialEnabled then break end
+			local wt=CFG.TRIAL_COOLDOWN_WAIT; for i=wt,1,-1 do if not ST.autoTrialEnabled then break end; updateTrialTimerDisplay(); task.wait(1) end end
+		ST.autoTrialRunning=false; stopContinuousTracker(); restoreFloors(); updateFloorLabel()
+		if not ST.running then unlockPhysics(); disableNoclip() end end)
+end
+
+createToggle("Auto Trial Tsunami",false,Color3.fromRGB(0,180,255),function(v) if v then startAutoTrialLoop() else instantStopAndReturn() end end)
+
+--// ===================== BUTTONS ===================== --
+local function createButton(t,c) local b=Instance.new("TextButton"); b.Size=UDim2.new(0.48,-2,0,btnHeight); b.BackgroundColor3=c; b.BorderSizePixel=0; b.Text=t; b.TextColor3=Color3.new(1,1,1); b.TextSize=isMobile and 9 or 13; b.Font=Enum.Font.GothamBold; Instance.new("UICorner",b).CornerRadius=UDim.new(0,8); return b end
+
+-- TOGGLE BUTTON
+do local row=Instance.new("Frame"); row.Size=UDim2.new(1,-16,0,btnHeight); row.Position=UDim2.new(0,8,0,yOff); row.BackgroundTransparency=1; row.Parent=contentFrame; yOff+=btnHeight+(isMobile and 2 or 3)
+	UI.ToggleBtn=Instance.new("TextButton"); UI.ToggleBtn.Size=UDim2.new(1,0,1,0); UI.ToggleBtn.Position=UDim2.new(0,0,0,0); UI.ToggleBtn.BackgroundColor3=Color3.fromRGB(40,140,40); UI.ToggleBtn.BorderSizePixel=0; UI.ToggleBtn.Text="START"; UI.ToggleBtn.TextColor3=Color3.new(1,1,1); UI.ToggleBtn.TextSize=isMobile and 11 or 16; UI.ToggleBtn.Font=Enum.Font.GothamBold; UI.ToggleBtn.Parent=row; Instance.new("UICorner",UI.ToggleBtn).CornerRadius=UDim.new(0,8) end
+
+do local row=Instance.new("Frame"); row.Size=UDim2.new(1,-16,0,btnHeight); row.Position=UDim2.new(0,8,0,yOff); row.BackgroundTransparency=1; row.Parent=contentFrame; yOff+=btnHeight+(isMobile and 2 or 3)
+	UI.RefreshBtn=createButton("REFRESH",Color3.fromRGB(40,80,160)); UI.RefreshBtn.Size=UDim2.new(0.48,0,1,0); UI.RefreshBtn.Position=UDim2.new(0,0,0,0); UI.RefreshBtn.Parent=row
+	UI.SelectAllBtn=createButton("ALL",Color3.fromRGB(100,60,160)); UI.SelectAllBtn.Size=UDim2.new(0.48,0,1,0); UI.SelectAllBtn.Position=UDim2.new(0.52,0,0,0); UI.SelectAllBtn.Parent=row end
+do local row=Instance.new("Frame"); row.Size=UDim2.new(1,-16,0,btnHeight); row.Position=UDim2.new(0,8,0,yOff); row.BackgroundTransparency=1; row.Parent=contentFrame; yOff+=btnHeight+(isMobile and 2 or 3)
+	UI.SavePosBtn=createButton("SAVE POS",Color3.fromRGB(180,120,0)); UI.SavePosBtn.Size=UDim2.new(0.48,0,1,0); UI.SavePosBtn.Position=UDim2.new(0,0,0,0); UI.SavePosBtn.Parent=row
+	UI.ReturnBtn=createButton("RETURN",Color3.fromRGB(0,140,180)); UI.ReturnBtn.Size=UDim2.new(0.48,0,1,0); UI.ReturnBtn.Position=UDim2.new(0.52,0,0,0); UI.ReturnBtn.Parent=row end
+do local row=Instance.new("Frame"); row.Size=UDim2.new(1,-16,0,btnHeight); row.Position=UDim2.new(0,8,0,yOff); row.BackgroundTransparency=1; row.Parent=contentFrame; yOff+=btnHeight+(isMobile and 2 or 3)
+	UI.ScanTrialBtn=createButton("SCAN",Color3.fromRGB(0,150,200)); UI.ScanTrialBtn.Size=UDim2.new(0.48,0,1,0); UI.ScanTrialBtn.Position=UDim2.new(0,0,0,0); UI.ScanTrialBtn.Parent=row
+	UI.GoTowerBtn=createButton("TOWER",Color3.fromRGB(180,100,0)); UI.GoTowerBtn.Size=UDim2.new(0.48,0,1,0); UI.GoTowerBtn.Position=UDim2.new(0.52,0,0,0); UI.GoTowerBtn.Parent=row end
+
+UI.ScanTrialBtn.MouseButton1Click:Connect(function()
+	local r,c,t,d=scanWithRetry(4,0.3)
+	if r then local f=matchRarityToFolder(r); UI.TrialDetailLabel.Text=string.format("Need:%d %s→%s",c or 1,r,f or "NONE"); UI.TrialDetailLabel.TextColor3=Color3.fromRGB(0,255,100)
+	else UI.TrialDetailLabel.Text="No rarity!"; UI.TrialDetailLabel.TextColor3=Color3.fromRGB(255,80,80) end; updateTrialTimerDisplay() end)
+UI.GoTowerBtn.MouseButton1Click:Connect(function()
+	if ST.running or ST.returning then return end
+	task.spawn(function() ST.returning=true; enableNoclip(); lockPhysics(); clearFloors(); updateFloorLabel()
+		travelToTower(); task.wait(0.3); fireTrialPrompt(); updateTrialTimerDisplay(); task.wait(0.5)
+		local r,c=scanWithRetry(4,0.3)
+		if r then local f=matchRarityToFolder(r); UI.TrialDetailLabel.Text=string.format("Need:%d %s→%s",c or 1,r,f or "NONE"); UI.TrialDetailLabel.TextColor3=Color3.fromRGB(0,255,100)
+		else UI.TrialDetailLabel.Text="No rarity"; UI.TrialDetailLabel.TextColor3=Color3.fromRGB(255,80,80) end
+		restoreFloors(); updateFloorLabel(); ST.returning=false; unlockPhysics(); disableNoclip() end) end)
+
+do local lf=Instance.new("Frame"); lf.Size=UDim2.new(1,-16,0,isMobile and 22 or 30); lf.Position=UDim2.new(0,8,0,yOff); lf.BackgroundColor3=Color3.fromRGB(18,18,28); lf.BorderSizePixel=0; lf.Parent=contentFrame; Instance.new("UICorner",lf).CornerRadius=UDim.new(0,6)
+	UI.LogLabel=Instance.new("TextLabel"); UI.LogLabel.Size=UDim2.new(1,-8,1,0); UI.LogLabel.Position=UDim2.new(0,4,0,0); UI.LogLabel.BackgroundTransparency=1; UI.LogLabel.Text="Last: --"; UI.LogLabel.TextColor3=Color3.fromRGB(130,130,160); UI.LogLabel.TextSize=isMobile and 7 or 10; UI.LogLabel.Font=Enum.Font.Gotham; UI.LogLabel.TextXAlignment=Enum.TextXAlignment.Left; UI.LogLabel.TextWrapped=true; UI.LogLabel.Parent=lf; yOff+=(isMobile and 26 or 34) end
+
+contentFrame.CanvasSize=UDim2.new(0,0,0,yOff+10)
+RunService.Heartbeat:Connect(function() if rootPart and rootPart.Parent then updateWaveStatus(rootPart.Position) end end)
+player.CharacterAdded:Connect(function(char) character=char; humanoid=char:WaitForChild("Humanoid"); rootPart=char:WaitForChild("HumanoidRootPart")
+	if ST.running or ST.autoTrialRunning or ST.returning then task.wait(0.5); enableNoclip(); lockPhysics() end end)
+
+local function refreshBrainrotFolders()
+	for _,d in pairs(ST.brainrotCheckboxes) do d.Button:Destroy() end; ST.brainrotCheckboxes={}
+	local f=scanRarityFolders(); for i,n in ipairs(f) do createBrainrotCheckbox(n,i) end
+	local l=UI.BrainrotScrollFrame:FindFirstChildOfClass("UIListLayout")
+	if l then l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() UI.BrainrotScrollFrame.CanvasSize=UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8) end)
+		UI.BrainrotScrollFrame.CanvasSize=UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8) end; return #f end
+local function refreshLuckyBlockRarities()
+	for _,d in pairs(ST.luckyBlockCheckboxes) do d.Button:Destroy() end; ST.luckyBlockCheckboxes={}
+	local r=scanLuckyBlockRarities(); for i,n in ipairs(r) do createLuckyBlockCheckbox(n,i) end
+	local l=UI.LuckyBlockScrollFrame:FindFirstChildOfClass("UIListLayout")
+	if l then l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() UI.LuckyBlockScrollFrame.CanvasSize=UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8) end)
+		UI.LuckyBlockScrollFrame.CanvasSize=UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8) end; return #r end
+local function refreshActiveTab() if ST.activeTab=="Brainrot" then UI.StatusLabel.Text="Found "..refreshBrainrotFolders().." folders" else UI.StatusLabel.Text="Found "..refreshLuckyBlockRarities().." rarities" end; updateFloorLabel() end
+
+--// ===================== FARMING ===================== --
+local function startFarming()
+	if ST.running or ST.returning then return end; ST.running=true; ST.farmingTab=ST.activeTab
+	if not ST.savedCFrame then saveCurrentPosition(); updateSavedPosLabel(); UI.LogLabel.Text="Auto-saved" end
+	enableNoclip(); lockPhysics(); clearFloors(); updateFloorLabel()
+	UI.StatusLabel.Text="Running..."; UI.ToggleBtn.Text="STOP"; UI.ToggleBtn.BackgroundColor3=Color3.fromRGB(180,40,40)
+	task.spawn(function()
+		refreshChar(); smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED)
+		while ST.running do
+			if ST.trialInProgress or ST.trialCollecting then task.wait(1); continue end; if not ST.running then break end
+			refreshChar(); checkMapChange()
+			if not hasSelectedRarities(ST.farmingTab) then UI.StatusLabel.Text="No rarity!"; task.wait(1); continue end
+			local targets=getTargets(ST.farmingTab); if #targets==0 then UI.StatusLabel.Text="No targets..."; task.wait(1); continue end
+			for _,target in ipairs(targets) do
+				if not ST.running then break end
+				if not target.Part or not target.Part.Parent or not target.Object or not target.Object.Parent then continue end
+				refreshChar(); local tp=target.Part.CFrame.Position
+				UI.PhaseLabel.Text="Travel -> "..target.Name; UI.StatusLabel.Text="["..target.Rarity.."] "..target.Name
+				if not smoothTween(CFrame.new(tp.X,tp.Y+CFG.TRAVEL_DEPTH,tp.Z),CFG.TWEEN_SPEED) then break end; if not ST.running then break end; task.wait(0.05)
+				if ST.waveCheckEnabled and target.Part and target.Part.Parent then
+					if isWaveApproaching(target.Part.CFrame.Position,CFG.WAVE_SAFE_DISTANCE) then waitForWavesToClear(target.Part.CFrame.Position,function(m) UI.PhaseLabel.Text=m end)
+						if not ST.running or not target.Part or not target.Part.Parent then break end; task.wait(0.2) end end
+				if not ST.running then break end; if not target.Part or not target.Part.Parent then continue end
+				local fp2=target.Part.CFrame.Position
+				if not smoothTween(CFrame.new(fp2.X,fp2.Y+CFG.GRAB_HEIGHT,fp2.Z),CFG.RISE_SPEED) then break end; if not ST.running then break end
+				if ST.waveCheckEnabled and isWaveNearby(rootPart.Position,CFG.WAVE_SAFE_DISTANCE*0.5) then smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED*2); task.wait(0.5); continue end
+				UI.PhaseLabel.Text="Grabbing!"
+				if target.Part and target.Part.Parent then if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce=Vector3.zero end
+					rootPart.CFrame=target.Part.CFrame*CFrame.new(0,2,0); rootPart.Velocity=Vector3.zero; rootPart.AssemblyLinearVelocity=Vector3.zero; task.wait(0.05)
+					if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce=Vector3.new(1e9,1e9,1e9); ST.bodyVel.Velocity=Vector3.zero end end
+				local pc=grabAllPrompts(target.Object)+grabNearbyPrompts(tp,15)
+				pcall(function() for _,p in pairs(target.Object:GetDescendants()) do if p:IsA("BasePart") then firetouchinterest(rootPart,p,0); task.wait(); firetouchinterest(rootPart,p,1) end end
+					if target.Part and target.Part.Parent then firetouchinterest(rootPart,target.Part,0); task.wait(); firetouchinterest(rootPart,target.Part,1) end end)
+				pcall(function() for _,d in pairs(target.Object:GetDescendants()) do if d:IsA("ClickDetector") then fireclickdetector(d) end end end)
+				ST.totalGrabbed+=1; UI.GrabLabel.Text="Grabbed: "..ST.totalGrabbed; UI.LogLabel.Text="["..target.Rarity.."] "..target.Name.." (+"..pc..")"
+				task.wait(CFG.WAIT_AT_TARGET); if not ST.running then break end
+				UI.PhaseLabel.Text="Diving..."; refreshChar()
+				smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED); task.wait(0.05)
+			end
+			if not ST.running then break end; if not CFG.AUTO_LOOP then ST.running=false; break end; task.wait(0.3) end
+		-- Loop ended, cleanup happens in instantStopAndReturn or naturally
+		if not ST.returning and not ST.autoTrialRunning then
+			restoreFloors(); updateFloorLabel(); unlockPhysics(); disableNoclip()
+			UI.ToggleBtn.Text="START"; UI.ToggleBtn.BackgroundColor3=Color3.fromRGB(40,140,40); UI.StatusLabel.Text="Stopped"; UI.PhaseLabel.Text="--" end
+	end)
+end
+
+--// ===================== TOGGLE BUTTON ===================== --
+UI.ToggleBtn.MouseButton1Click:Connect(function()
+	if ST.running or ST.autoTrialRunning then
+		instantStopAndReturn()
+	elseif not ST.returning then
+		startFarming()
+	end
+end)
+
+--// ===================== OTHER BUTTONS ===================== --
+UI.RefreshBtn.MouseButton1Click:Connect(refreshActiveTab)
+UI.SelectAllBtn.MouseButton1Click:Connect(function()
+	if ST.activeTab=="Brainrot" then local all=true; for n in pairs(ST.brainrotCheckboxes) do if not ST.brainrotSelectedRarities[n] then all=false; break end end
+		for n,d in pairs(ST.brainrotCheckboxes) do if all then ST.brainrotSelectedRarities[n]=nil; d.Check.Text=""; d.Check.BackgroundColor3=Color3.fromRGB(50,50,70) else ST.brainrotSelectedRarities[n]=true; d.Check.Text="Y"; d.Check.BackgroundColor3=Color3.fromRGB(40,100,40) end end
+	else local all=true; for n in pairs(ST.luckyBlockCheckboxes) do if not ST.luckyBlockSelectedRarities[n] then all=false; break end end
+		for n,d in pairs(ST.luckyBlockCheckboxes) do if all then ST.luckyBlockSelectedRarities[n]=nil; d.Check.Text=""; d.Check.BackgroundColor3=Color3.fromRGB(50,50,70) else ST.luckyBlockSelectedRarities[n]=true; d.Check.Text="Y"; d.Check.BackgroundColor3=Color3.fromRGB(100,80,0) end end end end)
+UI.SavePosBtn.MouseButton1Click:Connect(function()
+	if saveCurrentPosition() then updateSavedPosLabel(); UI.LogLabel.Text="Saved!"
+		UI.SavePosBtn.BackgroundColor3=Color3.fromRGB(40,180,40); task.delay(0.5,function() UI.SavePosBtn.BackgroundColor3=Color3.fromRGB(180,120,0) end) end end)
+
+-- RETURN BUTTON - stops everything then returns underground
+UI.ReturnBtn.MouseButton1Click:Connect(function()
+	if not ST.savedCFrame then UI.LogLabel.Text="No saved pos!"; return end
+	if ST.returning then return end -- already returning
+	if ST.running or ST.autoTrialRunning then
+		-- Stop farming/trial first, then return
+		instantStopAndReturn()
+	else
+		-- Not running, just do a smooth return
+		task.spawn(function()
+			ST.returning = true
+			if UI.StatusLabel then UI.StatusLabel.Text = "Returning..." end
+			if UI.PhaseLabel then UI.PhaseLabel.Text = "Returning..." end
+			enableNoclip(); lockPhysics()
+			smoothReturnToSaved()
+			task.wait(0.2)
+			ST.returning = false
+			unlockPhysics(); disableNoclip()
+			restoreFloors(); updateFloorLabel()
+			if UI.StatusLabel then UI.StatusLabel.Text = "Returned" end
+			if UI.PhaseLabel then UI.PhaseLabel.Text = "--" end
+			UI.ReturnBtn.BackgroundColor3 = Color3.fromRGB(40,200,40)
+			task.delay(0.5, function() UI.ReturnBtn.BackgroundColor3 = Color3.fromRGB(0,140,180) end)
+		end)
+	end
+end)
+
+CFG.BRAINROT_PATH.ChildAdded:Connect(function() task.wait(0.5); for n,d in pairs(ST.brainrotCheckboxes) do local f=CFG.BRAINROT_PATH:FindFirstChild(n); d.CountLabel.Text=f and tostring(#f:GetChildren()) or "0" end end)
+CFG.BRAINROT_PATH.ChildRemoved:Connect(function() task.wait(0.5); for n,d in pairs(ST.brainrotCheckboxes) do local f=CFG.BRAINROT_PATH:FindFirstChild(n); d.CountLabel.Text=f and tostring(#f:GetChildren()) or "0" end end)
+CFG.LUCKYBLOCK_PATH.ChildAdded:Connect(function() task.wait(0.5); for n,d in pairs(ST.luckyBlockCheckboxes) do d.CountLabel.Text=tostring(getLuckyBlockRarityCount(n)) end end)
+CFG.LUCKYBLOCK_PATH.ChildRemoved:Connect(function() task.wait(0.5); for n,d in pairs(ST.luckyBlockCheckboxes) do d.CountLabel.Text=tostring(getLuckyBlockRarityCount(n)) end end)
+
+startMapWatcher(); refreshBrainrotFolders(); refreshLuckyBlockRarities(); switchTab("Brainrot")
+UI.StatusLabel.Text="Ready - select & START"; UI.PhaseLabel.Text="--"; updateSavedPosLabel(); updateTrackerLabel(); updateFloorLabel()
+
+end
