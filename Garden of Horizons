@@ -26,13 +26,23 @@ local CFG = {
 	WAVE_SAFE_DISTANCE = 120,
 	WAVE_CHECK_INTERVAL = 0.3,
 	WAVE_MAX_WAIT = 30,
-	TOWER_CFRAME = CFrame.new(4329.02148, 6.50959015, -2.42385221, 1, 0, 0, 0, 1, 0, 0, 0, 1),
+	TOWER_CFRAME = CFrame.new(4314.5, -2.99998093, 0.000121998499, 1, 0, 0, 0, 1, 0, 0, 0, 1),
 	TRIAL_TIME_LIMIT = 260,
 	TRIAL_COOLDOWN_WAIT = 5,
 	TRACKER_INTERVAL = 5,
-	TRIAL_BATCH_SIZE = 3,
+	TRIAL_BATCH_SIZE = 1,
 }
 CFG.TOWER_POSITION = CFG.TOWER_CFRAME.Position
+
+-- Always returns the hardcoded tower CFrame
+local function getTowerCFrame()
+	return CFG.TOWER_CFRAME
+end
+
+local function getTowerPosition()
+	return CFG.TOWER_CFRAME.Position
+end
+
 local isMobile = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 local ST = {
@@ -59,6 +69,7 @@ local ST = {
 	noclipEnabled = false, noclipConnection = nil,
 	autoInstantEnabled = false, promptConnections = {},
 	minimized = false, autoReturnEnabled = true, waveCheckEnabled = true,
+	respawning = false,
 }
 local UI = {}
 
@@ -135,79 +146,144 @@ local function startMapWatcher()
 end
 
 --// ===================== RARITY / SCANNER ===================== --
-local RARITY_KEYWORDS = {"divine","secret","mythical","mythic","legendary","epic","rare","uncommon","common"}
+local RARITY_KEYWORDS = {"celestial","divine","secret","mythical","mythic","legendary","epic","rare","uncommon","common"}
 local function getInfoFrame() local ok, i = pcall(function() return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Billboard.BillboardGui.Frame.Info end); return ok and i or nil end
-local function getTrialTimerContainer() local i = getInfoFrame(); return i and i:FindFirstChild("TrialTimerContainer") or nil end
-local function getCooldownContainer() local i = getInfoFrame(); return i and i:FindFirstChild("CooldownContainer") or nil end
-local function getProximityPrompt() local ok, p = pcall(function() return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Prompt.ProximityPrompt end); return (ok and p and p:IsA("ProximityPrompt")) and p or nil end
+local function getTrialTimerContainer() local ok, tm = pcall(function() return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Billboard.BillboardGui.Frame.Info.TrialTimerContainer end); return (ok and tm and tm.Parent) and tm or (getInfoFrame() and getInfoFrame():FindFirstChild("TrialTimerContainer") or nil) end
+local function getCooldownContainer() local ok, cd = pcall(function() return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Billboard.BillboardGui.Frame.Info.CooldownContainer end); return (ok and cd and cd.Parent) and cd or (getInfoFrame() and getInfoFrame():FindFirstChild("CooldownContainer") or nil) end
+local function getProximityPrompt()
+	local ok, promptObj = pcall(function()
+		return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Prompt
+	end)
+	if not ok or not promptObj or not promptObj.Parent then return nil end
+	if promptObj:IsA("ProximityPrompt") then return promptObj end
+	for _, c in pairs(promptObj:GetDescendants()) do
+		if c:IsA("ProximityPrompt") then return c end
+	end
+	for _, c in pairs(promptObj:GetChildren()) do
+		if c:IsA("ProximityPrompt") then return c end
+	end
+	return nil
+end
 
 local function extractRarityFromText(text)
-	if not text or #text == 0 then return nil, nil end; local lower = string.lower(text)
+	if not text or #text == 0 then return nil, nil end
+	local lower = string.lower(text)
 	if string.find(lower, "time remaining") or string.find(lower, "cooldown") or string.find(lower, "seconds left") or string.find(lower, "minutes left") then return nil, nil end
 	if string.find(lower, "waiting") and not string.find(lower, "bring") then return nil, nil end
 	if lower:match("^%s*%d+%s*$") or lower:match("^%s*%d+:%d+%s*$") then return nil, nil end
+	if lower:match("^%s*%d+:%d+") or lower:match("^%s*%d+s%s*$") then return nil, nil end
 	for _, kw in ipairs(RARITY_KEYWORDS) do
-		if string.find(lower, kw) then
-			local c = tonumber(lower:match("(%d+)%s+"..kw)) or tonumber(lower:match(kw.."%s*x?(%d+)")) or tonumber(lower:match("x(%d+)")) or tonumber(lower:match("%((%d+)%)"))
-			if not c then for num in lower:gmatch("(%d+)") do local n = tonumber(num); if n and n >= 1 and n <= 50 then c = n; break end end end
+		if string.find(lower, kw, 1, true) then
+			local c = nil
+			c = c or tonumber(lower:match("(%d+)%s*x?%s*"..kw))
+			c = c or tonumber(lower:match(kw.."%s*[x:%-]?%s*(%d+)"))
+			c = c or tonumber(lower:match("[%(%[](%d+)[%)%]]"))
+			c = c or tonumber(lower:match("x(%d+)"))
+			if not c then
+				for num in lower:gmatch("(%d+)") do
+					local n = tonumber(num)
+					if n and n >= 1 and n <= 99 then c = n; break end
+				end
+			end
 			return kw, c or 1
 		end
-	end; return nil, nil
+	end
+	return nil, nil
+end
+
+local function readInfoFrameDirect()
+	local ok, info = pcall(function()
+		return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Billboard.BillboardGui.Frame.Info
+	end)
+	if not ok or not info or not info.Parent then return nil, nil, nil end
+
+	local best, bestPri = nil, 999
+	for _, desc in pairs(info:GetDescendants()) do
+		if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
+			local text = desc.Text
+			if not text or #text < 2 then continue end
+			local lower = string.lower(text)
+
+			local inTimer = false
+			local par = desc.Parent
+			while par and par ~= info do
+				local pn = string.lower(par.Name)
+				if string.find(pn,"timer",1,true) or string.find(pn,"cooldown",1,true) or string.find(pn,"countdown",1,true) then
+					inTimer = true; break
+				end
+				par = par.Parent
+			end
+			if inTimer then continue end
+
+			if lower:match("^%s*%d+%s*$") then continue end
+			if lower:match("^%s*%d+:%d+") then continue end
+			if lower:match("^%s*%d+s%s*$") then continue end
+			if string.find(lower,"time remaining",1,true) then continue end
+			if string.find(lower,"cooldown",1,true) then continue end
+			if string.find(lower,"seconds left",1,true) then continue end
+			if string.find(lower,"time",1,true) and string.find(lower,"%d") and not string.find(lower,"bring",1,true) and not string.find(lower,"collect",1,true) and not string.find(lower,"deliver",1,true) and not string.find(lower,"need",1,true) then continue end
+
+			local r, c = extractRarityFromText(text)
+			if r then
+				local pri = 50
+				if     string.find(lower,"bring",1,true)    then pri = 1
+				elseif string.find(lower,"collect",1,true)  then pri = 2
+				elseif string.find(lower,"deliver",1,true)  then pri = 3
+				elseif string.find(lower,"need",1,true)     then pri = 4
+				elseif string.find(lower,"gather",1,true)   then pri = 5
+				elseif string.find(lower,"find",1,true)     then pri = 6
+				elseif string.find(lower,"get",1,true)      then pri = 7
+				elseif string.find(lower,"brainrot",1,true) then pri = 8
+				end
+				if pri < bestPri then bestPri = pri; best = {rarity=r, count=c, text=text} end
+			end
+		end
+	end
+	if best then return best.rarity, best.count, best.text end
+	return nil, nil, nil
 end
 
 local function scanTrialFromBillboard()
-	local dbg = {}; local info = getInfoFrame()
-	if info then local bm, bp = nil, 999
-		for _, desc in pairs(info:GetDescendants()) do
-			if desc:IsA("TextLabel") or desc:IsA("TextButton") or desc:IsA("TextBox") then
-				local text = desc.Text; if text and #text > 1 then local lower = string.lower(text)
-					table.insert(dbg, string.format("[%s]%s", desc.Name, text))
-					local isT = false; local par = desc.Parent
-					while par and par ~= info do local pn = string.lower(par.Name)
-						if string.find(pn,"timer") or string.find(pn,"cooldown") or string.find(pn,"countdown") then isT = true; break end; par = par.Parent end
-					if isT then continue end
-					if lower:match("^%s*%d+%s*$") or lower:match("^%s*%d+:%d+") then continue end
-					if string.find(lower,"time") and string.find(lower,"%d") and not string.find(lower,"bring") then continue end
-					local r, c = extractRarityFromText(text)
-					if r then local pri = 50
-						if string.find(lower,"bring") then pri=1 elseif string.find(lower,"collect") then pri=2
-						elseif string.find(lower,"deliver") then pri=3 elseif string.find(lower,"need") then pri=4
-						elseif string.find(lower,"gather") then pri=5 elseif string.find(lower,"find") then pri=6
-						elseif string.find(lower,"get") then pri=7 end
-						if pri < bp then bp = pri; bm = {rarity=r,count=c,text=text} end
-					end
-				end
-			end
-		end
-		if bm then return bm.rarity, bm.count, bm.text, table.concat(dbg," | ") end
-	end
+	local r, c, t = readInfoFrameDirect()
+	if r then return r, c, t, "[DIRECT]" end
+
 	local pg = player:FindFirstChild("PlayerGui")
 	if pg then local bm, bp = nil, 999
 		for _, desc in pairs(pg:GetDescendants()) do
 			if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and desc.Visible then
 				local text = desc.Text; if text and #text > 2 then local lower = string.lower(text)
-					local isTR = string.find(lower,"trial") or string.find(lower,"bring") or string.find(lower,"collect") or string.find(lower,"tsunami") or string.find(lower,"deliver") or (string.find(lower,"need") and string.find(lower,"brainrot"))
+					local isTR = string.find(lower,"trial",1,true) or string.find(lower,"bring",1,true) or string.find(lower,"collect",1,true) or string.find(lower,"tsunami",1,true) or string.find(lower,"deliver",1,true) or (string.find(lower,"need",1,true) and string.find(lower,"brainrot",1,true))
 					if not isTR then local p = desc.Parent; while p and p ~= pg do local pn = string.lower(p.Name)
-						if string.find(pn,"trial") or string.find(pn,"tsunami") or string.find(pn,"tower") or string.find(pn,"quest") then isTR = true; break end; p = p.Parent end end
-					if isTR then local r, c = extractRarityFromText(text)
-						if r then local pri = 50
-							if string.find(lower,"bring") then pri=1 elseif string.find(lower,"collect") then pri=2
-							elseif string.find(lower,"deliver") then pri=3 elseif string.find(lower,"need") then pri=4 end
-							if pri < bp then bp = pri; bm = {rarity=r,count=c,text=text} end end end
+						if string.find(pn,"trial",1,true) or string.find(pn,"tsunami",1,true) or string.find(pn,"tower",1,true) or string.find(pn,"quest",1,true) then isTR = true; break end; p = p.Parent end end
+					if isTR then local rv, cv = extractRarityFromText(text)
+						if rv then local pri = 50
+							if string.find(lower,"bring",1,true) then pri=1 elseif string.find(lower,"collect",1,true) then pri=2
+							elseif string.find(lower,"deliver",1,true) then pri=3 elseif string.find(lower,"need",1,true) then pri=4 end
+							if pri < bp then bp = pri; bm = {rarity=rv,count=cv,text=text} end end end
 				end
 			end
 		end
-		if bm then return bm.rarity, bm.count, bm.text, table.concat(dbg," | ").." [GUI]" end
+		if bm then return bm.rarity, bm.count, bm.text, "[GUI_FALLBACK]" end
 	end
-	return nil, nil, nil, table.concat(dbg," | ").." [NONE]"
+	return nil, nil, nil, "[NONE]"
 end
 
 local function scanWithRetry(ma, db)
-	ma = ma or 5; db = db or 0.4; local res = {}
-	for i = 1, ma do if not ST.autoTrialEnabled then return nil,nil,nil,"stopped" end
-		local r,c,t,d = scanTrialFromBillboard(); if r then res[r] = (res[r] or 0)+1; if res[r] >= 2 then return r,c,t,d end end
-		if i < ma then task.wait(db) end end
-	for i = 1, ma do local r,c,t,d = scanTrialFromBillboard(); if r then return r,c,t,d end; task.wait(0.2) end
+	ma = ma or 6; db = db or 0.3; local res = {}
+	for i = 1, ma do
+		if not ST.autoTrialEnabled then return nil,nil,nil,"stopped" end
+		local r,c,t,d = scanTrialFromBillboard()
+		if r then
+			res[r] = (res[r] or 0) + 1
+			if res[r] >= 2 then return r,c,t,d end
+		end
+		if i < ma then task.wait(db) end
+	end
+	for i = 1, 4 do
+		local r,c,t,d = scanTrialFromBillboard()
+		if r then return r,c,t,d end
+		task.wait(0.2)
+	end
 	return nil,nil,nil,"no_result"
 end
 
@@ -227,9 +303,9 @@ end
 local function matchRarityToFolder(kw)
 	if not kw then return nil end; local lower = string.lower(kw)
 	for _, c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if (c:IsA("Folder") or c:IsA("Model")) and string.lower(c.Name)==lower then return c.Name end end
-	for _, c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if (c:IsA("Folder") or c:IsA("Model")) then local cn=string.lower(c.Name); if string.find(cn,lower) or string.find(lower,cn) then return c.Name end end end
+	for _, c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if (c:IsA("Folder") or c:IsA("Model")) then local cn=string.lower(c.Name); if string.find(cn,lower,1,true) or string.find(lower,cn,1,true) then return c.Name end end end
 	if #lower > 4 then local sh = lower:sub(1,-3)
-		for _, c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if (c:IsA("Folder") or c:IsA("Model")) then local cn=string.lower(c.Name); if string.find(cn,sh) or string.find(sh,cn) then return c.Name end end end end
+		for _, c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if (c:IsA("Folder") or c:IsA("Model")) then local cn=string.lower(c.Name); if string.find(cn,sh,1,true) or string.find(sh,cn,1,true) then return c.Name end end end end
 	return nil
 end
 
@@ -261,31 +337,67 @@ local function updateTrialTimerDisplay()
 end
 
 local function trackerRescanAtTower()
-	task.wait(0.5); local nr,nc,_,di = scanWithRetry(4,0.3)
-	if not nr then task.wait(0.5); nr,nc,_,di = scanWithRetry(3,0.5); if not nr then return nil,nil,"completed",di end end
-	local nf = matchRarityToFolder(nr); if not nf then return nr,nc,"no_folder",di end
+	task.wait(0.3)
+	local nr, nc = readInfoFrameDirect()
+	if not nr then
+		task.wait(0.3); nr, nc = readInfoFrameDirect()
+	end
+	if not nr then
+		local _, _, _, di; nr,nc,_,di = scanWithRetry(4,0.3)
+		if not nr then task.wait(0.4); nr,nc,_,di = scanWithRetry(3,0.4) end
+		if not nr then return nil,nil,"completed","no_rarity" end
+	end
+	local nf = matchRarityToFolder(nr); if not nf then return nr,nc,"no_folder","" end
 	ST.lastScanResult=nr; ST.lastScanFolder=nf
-	if ST.currentTrialRarity and nr ~= ST.currentTrialRarity then ST.previousTrialRarity=ST.currentTrialRarity; ST.currentTrialRarity=nr; ST.currentTrialFolder=nf; ST.rarityChangeCount=ST.rarityChangeCount+1; autoSelectTrialRarity(nf); return nr,nc,"changed",di end
-	ST.currentTrialRarity=nr; ST.currentTrialFolder=nf; return nr,nc,"same",di
+	if ST.currentTrialRarity and nr ~= ST.currentTrialRarity then
+		ST.previousTrialRarity=ST.currentTrialRarity; ST.currentTrialRarity=nr; ST.currentTrialFolder=nf
+		ST.rarityChangeCount=ST.rarityChangeCount+1; autoSelectTrialRarity(nf); return nr,nc,"changed",""
+	end
+	ST.currentTrialRarity=nr; ST.currentTrialFolder=nf; return nr,nc,"same",""
 end
 
 local function startContinuousTracker()
-	if ST.continuousTrackerRunning then return end; ST.continuousTrackerRunning=true; ST.trackerScanCount=0
+	if ST.continuousTrackerRunning then return end
+	ST.continuousTrackerRunning = true
+	ST.trackerScanCount = 0
 	task.spawn(function()
 		while ST.autoTrialEnabled and ST.continuousTrackerRunning do
-			if ST.trialInProgress and ST.trialCollecting and ST.currentTrialRarity then
-				ST.trackerScanCount=ST.trackerScanCount+1; local nr,nc = scanTrialFromBillboard()
-				if nr then local nf = matchRarityToFolder(nr)
-					if nf and ST.currentTrialRarity and nr ~= ST.currentTrialRarity then
-						ST.previousTrialRarity=ST.currentTrialRarity; ST.currentTrialRarity=nr; ST.currentTrialFolder=nf
-						ST.rarityChangeCount=ST.rarityChangeCount+1; ST.trialRequired=nc or 1; autoSelectTrialRarity(nf) end
-					ST.lastScanResult=nr; ST.lastScanFolder=nf end
-				updateTrackerLabel(); updateTrialTimerDisplay() end
+			if ST.trialInProgress and ST.trialCollecting then
+				ST.trackerScanCount = ST.trackerScanCount + 1
+				local nr, nc = readInfoFrameDirect()
+				if nr then
+					local nf = matchRarityToFolder(nr)
+					if nf then
+						if ST.currentTrialRarity and nr ~= ST.currentTrialRarity then
+							ST.previousTrialRarity = ST.currentTrialRarity
+							ST.currentTrialRarity = nr
+							ST.currentTrialFolder = nf
+							ST.rarityChangeCount = ST.rarityChangeCount + 1
+							ST.trialRequired = nc or 1
+							autoSelectTrialRarity(nf)
+							if UI.TrialStatusLabel then
+								UI.TrialStatusLabel.Text = string.format("Changed! Need %d %s", nc or 1, nf)
+								UI.TrialStatusLabel.TextColor3 = Color3.fromRGB(255, 200, 0)
+							end
+						else
+							ST.currentTrialRarity = nr
+							ST.currentTrialFolder = nf
+							ST.trialRequired = nc or ST.trialRequired
+						end
+						ST.lastScanResult = nr
+						ST.lastScanFolder = nf
+					end
+				end
+				updateTrackerLabel()
+				updateTrialTimerDisplay()
+			end
 			checkMapChange()
-			for i=1,math.floor(CFG.TRACKER_INTERVAL/0.5) do if not ST.autoTrialEnabled or not ST.continuousTrackerRunning then break end; task.wait(0.5) end
-		end; ST.continuousTrackerRunning=false end)
+			task.wait(0.5)
+		end
+		ST.continuousTrackerRunning = false
+	end)
 end
-local function stopContinuousTracker() ST.continuousTrackerRunning=false end
+local function stopContinuousTracker() ST.continuousTrackerRunning = false end
 
 --// ===================== TSUNAMI ===================== --
 local function getTsunamiParts() local p={}; if not CFG.TSUNAMI_PATH or not CFG.TSUNAMI_PATH.Parent then return p end; for _,o in pairs(CFG.TSUNAMI_PATH:GetDescendants()) do if o:IsA("BasePart") then table.insert(p,o) end end; return p end
@@ -327,7 +439,7 @@ end
 --// ===================== TWEEN ===================== --
 local function smoothTween(targetCFrame, speed)
 	if not rootPart or not rootPart.Parent then return false end
-	-- Allow tween if running, returning, or trial active
+	if ST.respawning then return false end
 	if not ST.running and not ST.autoTrialEnabled and not ST.returning then return false end
 	local distance = (rootPart.Position - targetCFrame.Position).Magnitude
 	if distance < 1 then rootPart.CFrame = targetCFrame; return true end
@@ -359,18 +471,14 @@ local function smoothReturnToSaved()
 	ST.returning = true
 	enableNoclip(); lockPhysics()
 	if UI.PhaseLabel then UI.PhaseLabel.Text = "Returning: Diving..." end
-	-- Step 1: Dive down to travel depth
 	smoothTween(CFrame.new(rootPart.Position.X, rootPart.Position.Y + CFG.TRAVEL_DEPTH, rootPart.Position.Z), CFG.DIVE_SPEED)
 	task.wait(0.05)
 	if not ST.returning then ST.returning = false; return false end
-	-- Step 2: Travel underground to saved position
 	if UI.PhaseLabel then UI.PhaseLabel.Text = "Returning: Underground..." end
 	smoothTween(CFrame.new(ST.savedCFrame.Position.X, ST.savedCFrame.Position.Y + CFG.TRAVEL_DEPTH, ST.savedCFrame.Position.Z), CFG.TWEEN_SPEED)
 	task.wait(0.05)
 	if not ST.returning then ST.returning = false; return false end
-	-- Step 3: Wait for waves at destination
 	waitForWavesToClear(ST.savedCFrame.Position, function(m) if UI.PhaseLabel then UI.PhaseLabel.Text = m end end)
-	-- Step 4: Rise up to saved position
 	if UI.PhaseLabel then UI.PhaseLabel.Text = "Returning: Rising..." end
 	smoothTween(ST.savedCFrame, CFG.RISE_SPEED)
 	task.wait(0.1)
@@ -378,48 +486,220 @@ local function smoothReturnToSaved()
 	return true
 end
 
---// ===================== PROMPTS ===================== --
+--// ===================== IMPROVED PROMPTS ===================== --
 local function fireProximityPrompt(prompt)
 	if not prompt or not prompt:IsA("ProximityPrompt") then return end
-	local oh,od,oe,ox = prompt.HoldDuration, prompt.MaxActivationDistance, prompt.Enabled, prompt.Exclusivity
-	prompt.HoldDuration=0; prompt.MaxActivationDistance=CFG.PROMPT_OVERRIDE_DISTANCE; prompt.Enabled=true; prompt.Exclusivity=Enum.ProximityPromptExclusivity.AlwaysShow
-	prompt:InputHoldBegin(); prompt:InputHoldEnd()
-	task.delay(0.1, function() if prompt and prompt.Parent then prompt.HoldDuration=oh; prompt.MaxActivationDistance=od; prompt.Enabled=oe; prompt.Exclusivity=ox end end)
+	local oh = prompt.HoldDuration
+	local od = prompt.MaxActivationDistance
+	local oe = prompt.Enabled
+	local ox = prompt.Exclusivity
+	prompt.HoldDuration = 0
+	prompt.MaxActivationDistance = CFG.PROMPT_OVERRIDE_DISTANCE
+	prompt.Enabled = true
+	prompt.Exclusivity = Enum.ProximityPromptExclusivity.AlwaysShow
+	pcall(function() prompt:InputHoldBegin() end)
+	pcall(function() prompt:InputHoldEnd() end)
+	pcall(function()
+		local ProximityPromptService = game:GetService("ProximityPromptService")
+		ProximityPromptService:TriggerPrompt(prompt)
+	end)
+	local parentPart = prompt.Parent
+	if parentPart and parentPart:IsA("BasePart") and rootPart and rootPart.Parent then
+		pcall(function()
+			firetouchinterest(rootPart, parentPart, 0)
+			firetouchinterest(rootPart, parentPart, 1)
+		end)
+	end
+	task.delay(0.15, function()
+		if prompt and prompt.Parent then
+			prompt.HoldDuration = oh
+			prompt.MaxActivationDistance = od
+			prompt.Enabled = oe
+			prompt.Exclusivity = ox
+		end
+	end)
 end
-local function grabAllPrompts(obj) if not obj or not obj.Parent then return 0 end; local c=0
-	if obj:IsA("ProximityPrompt") then fireProximityPrompt(obj); c+=1 end
-	for _,d in pairs(obj:GetDescendants()) do if d:IsA("ProximityPrompt") then fireProximityPrompt(d); c+=1 end end
-	if obj.Parent then for _,ch in pairs(obj.Parent:GetChildren()) do if ch:IsA("ProximityPrompt") then fireProximityPrompt(ch); c+=1 end end end; return c end
-local function grabNearbyPrompts(pos, rad) rad=rad or 20; local c=0
-	for _,d in pairs(workspace:GetDescendants()) do if d:IsA("ProximityPrompt") then local p=d.Parent; if p and p:IsA("BasePart") and (p.Position-pos).Magnitude<=rad then fireProximityPrompt(d); c+=1 end end end; return c end
-local function enableAutoInstantPrompts() ST.autoInstantEnabled=true
-	for _,d in pairs(workspace:GetDescendants()) do if d:IsA("ProximityPrompt") then d.HoldDuration=0; d.MaxActivationDistance=math.max(d.MaxActivationDistance,15) end end
-	ST.promptConnections[#ST.promptConnections+1]=workspace.DescendantAdded:Connect(function(d) if ST.autoInstantEnabled and d:IsA("ProximityPrompt") then task.wait(); d.HoldDuration=0; d.MaxActivationDistance=math.max(d.MaxActivationDistance,15) end end) end
-local function disableAutoInstantPrompts() ST.autoInstantEnabled=false; for _,c in pairs(ST.promptConnections) do c:Disconnect() end; ST.promptConnections={} end
+
+local function grabAllPrompts(obj)
+	if not obj or not obj.Parent then return 0 end
+	local fired = {}
+	local function fireOnce(p)
+		if not p or not p:IsA("ProximityPrompt") or fired[p] then return end
+		fired[p] = true
+		fireProximityPrompt(p)
+	end
+	if obj:IsA("ProximityPrompt") then fireOnce(obj) end
+	for _, d in pairs(obj:GetDescendants()) do fireOnce(d) end
+	if obj.Parent then for _, ch in pairs(obj.Parent:GetChildren()) do fireOnce(ch) end end
+	task.wait(0.08)
+	for p in pairs(fired) do
+		pcall(function() p:InputHoldBegin() end)
+		pcall(function() p:InputHoldEnd() end)
+	end
+	return 0
+end
+
+local function grabNearbyPrompts(pos, rad)
+	rad = rad or 25
+	local list = {}
+	for _, d in pairs(workspace:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then
+			local p = d.Parent
+			if p and p:IsA("BasePart") then
+				local dist = (p.Position - pos).Magnitude
+				if dist <= rad then
+					table.insert(list, {prompt = d, dist = dist})
+				end
+			end
+		end
+	end
+	table.sort(list, function(a, b) return a.dist < b.dist end)
+	for _, entry in ipairs(list) do
+		fireProximityPrompt(entry.prompt)
+	end
+	task.wait(0.08)
+	for _, entry in ipairs(list) do
+		if entry.prompt and entry.prompt.Parent then
+			pcall(function() entry.prompt:InputHoldBegin() end)
+			pcall(function() entry.prompt:InputHoldEnd() end)
+		end
+	end
+	return #list
+end
+
+local function fullGrabObject(obj, targetPart, pos)
+	if not obj or not obj.Parent then return end
+	if targetPart and targetPart.Parent and rootPart and rootPart.Parent then
+		if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce = Vector3.zero end
+		rootPart.CFrame = targetPart.CFrame * CFrame.new(0, 2, 0)
+		rootPart.Velocity = Vector3.zero
+		rootPart.AssemblyLinearVelocity = Vector3.zero
+		if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce = Vector3.new(1e9,1e9,1e9); ST.bodyVel.Velocity = Vector3.zero end
+	end
+	task.wait(0.05)
+	grabAllPrompts(obj)
+	grabNearbyPrompts(pos or (targetPart and targetPart.Position or Vector3.zero), 20)
+	pcall(function()
+		for _, p in pairs(obj:GetDescendants()) do
+			if p:IsA("BasePart") then
+				firetouchinterest(rootPart, p, 0)
+				task.wait()
+				firetouchinterest(rootPart, p, 1)
+			end
+		end
+		if targetPart and targetPart.Parent then
+			firetouchinterest(rootPart, targetPart, 0)
+			task.wait()
+			firetouchinterest(rootPart, targetPart, 1)
+		end
+	end)
+	pcall(function()
+		for _, d in pairs(obj:GetDescendants()) do
+			if d:IsA("ClickDetector") then fireclickdetector(d) end
+		end
+	end)
+	task.wait(0.08)
+	grabAllPrompts(obj)
+	grabNearbyPrompts(pos or (targetPart and targetPart.Position or Vector3.zero), 20)
+end
+
+local function enableAutoInstantPrompts()
+	ST.autoInstantEnabled = true
+	for _, d in pairs(workspace:GetDescendants()) do
+		if d:IsA("ProximityPrompt") then
+			d.HoldDuration = 0
+			d.MaxActivationDistance = math.max(d.MaxActivationDistance, 15)
+		end
+	end
+	ST.promptConnections[#ST.promptConnections+1] = workspace.DescendantAdded:Connect(function(d)
+		if ST.autoInstantEnabled and d:IsA("ProximityPrompt") then
+			task.wait()
+			d.HoldDuration = 0
+			d.MaxActivationDistance = math.max(d.MaxActivationDistance, 15)
+		end
+	end)
+end
+local function disableAutoInstantPrompts()
+	ST.autoInstantEnabled = false
+	for _, c in pairs(ST.promptConnections) do c:Disconnect() end
+	ST.promptConnections = {}
+end
 
 local function refreshChar()
+	local waited = 0
+	while ST.respawning and waited < 5 do task.wait(0.2); waited += 0.2 end
 	if not character or not character.Parent then character=player.Character or player.CharacterAdded:Wait(); humanoid=character:WaitForChild("Humanoid"); rootPart=character:WaitForChild("HumanoidRootPart"); task.wait(0.3); enableNoclip(); lockPhysics() end
 	if not ST.bodyVel or not ST.bodyVel.Parent or not ST.bodyGyro or not ST.bodyGyro.Parent then lockPhysics() end end
 
 local function travelToTower()
 	refreshChar(); enableNoclip(); lockPhysics()
+	local tp = getTowerPosition()
+	local tc = getTowerCFrame()
+	-- Dive down from current position
 	smoothTween(CFrame.new(rootPart.Position.X, rootPart.Position.Y+CFG.TRAVEL_DEPTH, rootPart.Position.Z), CFG.DIVE_SPEED); task.wait(0.05)
-	smoothTween(CFrame.new(CFG.TOWER_POSITION.X, CFG.TOWER_POSITION.Y+CFG.TRAVEL_DEPTH, CFG.TOWER_POSITION.Z), CFG.TWEEN_SPEED); task.wait(0.05)
-	smoothTween(CFrame.new(CFG.TOWER_POSITION.X, CFG.TOWER_POSITION.Y+CFG.GRAB_HEIGHT, CFG.TOWER_POSITION.Z), CFG.RISE_SPEED); task.wait(0.15)
-	rootPart.CFrame=CFG.TOWER_CFRAME*CFrame.new(0,3,4); rootPart.Velocity=Vector3.zero; rootPart.AssemblyLinearVelocity=Vector3.zero; task.wait(0.1); return true end
-local function fireTrialPrompt() local p=getProximityPrompt(); if not p then return false end
-	rootPart.CFrame=CFG.TOWER_CFRAME*CFrame.new(0,3,4); rootPart.Velocity=Vector3.zero; task.wait(0.1)
-	fireProximityPrompt(p); task.wait(0.3); fireProximityPrompt(p); task.wait(0.2); return true end
+	-- Travel underground to tower X/Z
+	smoothTween(CFrame.new(tp.X, tp.Y+CFG.TRAVEL_DEPTH, tp.Z), CFG.TWEEN_SPEED); task.wait(0.05)
+	-- Rise up to tower position
+	smoothTween(tc, CFG.RISE_SPEED); task.wait(0.15)
+	-- Snap onto tower position
+	rootPart.CFrame = tc
+	rootPart.Velocity = Vector3.zero; rootPart.AssemblyLinearVelocity = Vector3.zero; task.wait(0.1)
+	return true
+end
 
---// ===================== TARGETS ===================== --
+local function fireTrialPrompt()
+	local p = getProximityPrompt(); if not p then return false end
+	local tp = getTowerPosition()
+	rootPart.CFrame = CFrame.new(tp.X, tp.Y, tp.Z)
+	rootPart.Velocity = Vector3.zero; task.wait(0.1)
+	fireProximityPrompt(p); task.wait(0.3); fireProximityPrompt(p); task.wait(0.2); return true
+end
+
+local function extractLuckyBlockRarity(name)
+	if not name then return nil end
+	local lower = string.lower(name)
+	local fromSuffix = name:match("_(%w+)$")
+	if fromSuffix and #fromSuffix > 2 then return fromSuffix end
+	for _, kw in ipairs(RARITY_KEYWORDS) do
+		if string.find(lower, kw, 1, true) then
+			return kw:sub(1,1):upper()..kw:sub(2)
+		end
+	end
+	local lastWord = name:match("[_%-%.%s](%w+)%s*$")
+	if lastWord and #lastWord > 2 then return lastWord end
+	return nil
+end
+
 local function scanRarityFolders() local f={}; for _,c in pairs(CFG.BRAINROT_PATH:GetChildren()) do if c:IsA("Folder") or c:IsA("Model") then table.insert(f,c.Name) end end; table.sort(f); return f end
 local function getBrainrots(sel) local b={}; for _,rn in pairs(sel) do local fo=CFG.BRAINROT_PATH:FindFirstChild(rn)
 	if fo then for _,br in pairs(fo:GetChildren()) do local p=br:IsA("Model") and (br.PrimaryPart or br:FindFirstChildWhichIsA("BasePart")) or (br:IsA("BasePart") and br or nil)
 		if p then table.insert(b,{Name=br.Name,Rarity=rn,Part=p,Object=br}) end end end end; return b end
-local function scanLuckyBlockRarities() local r,s={},{}; for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do local ra=c.Name:match("_(%w+)$"); if ra and not s[ra] then s[ra]=true; table.insert(r,ra) end end; table.sort(r); return r end
-local function getLuckyBlockRarityCount(ra) local c=0; for _,ch in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do if ch.Name:match("_(%w+)$")==ra then c+=1 end end; return c end
-local function getLuckyBlocks(selR) local b={}; for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do local r=c.Name:match("_(%w+)$"); if r and selR[r] then
-	local p=c:IsA("Model") and (c.PrimaryPart or c:FindFirstChildWhichIsA("BasePart")) or (c:IsA("BasePart") and c or nil); if p then table.insert(b,{Name=c.Name,Rarity=r,Part=p,Object=c}) end end end; return b end
+local function scanLuckyBlockRarities()
+	local r,s={},{}
+	for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do
+		local ra = extractLuckyBlockRarity(c.Name)
+		if ra and not s[ra] then s[ra]=true; table.insert(r,ra) end
+	end
+	table.sort(r); return r
+end
+local function getLuckyBlockRarityCount(ra)
+	local c=0
+	for _,ch in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do
+		if extractLuckyBlockRarity(ch.Name)==ra then c+=1 end
+	end
+	return c
+end
+local function getLuckyBlocks(selR)
+	local b={}
+	for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do
+		local r = extractLuckyBlockRarity(c.Name)
+		if r and selR[r] then
+			local p=c:IsA("Model") and (c.PrimaryPart or c:FindFirstChildWhichIsA("BasePart")) or (c:IsA("BasePart") and c or nil)
+			if p then table.insert(b,{Name=c.Name,Rarity=r,Part=p,Object=c}) end
+		end
+	end
+	return b
+end
 local function hasSelectedRarities(tab) tab=tab or ST.activeTab
 	if tab=="Brainrot" then for _ in pairs(ST.brainrotSelectedRarities) do return true end else for _ in pairs(ST.luckyBlockSelectedRarities) do return true end end; return false end
 local function getTargets(tab) tab=tab or ST.activeTab
@@ -427,42 +707,30 @@ local function getTargets(tab) tab=tab or ST.activeTab
 
 --// ===================== INSTANT STOP + SMOOTH RETURN ===================== --
 local function instantStopAndReturn()
-	-- 1. Kill all running states
 	local wasRunning = ST.running or ST.autoTrialRunning
 	ST.running = false; ST.autoTrialEnabled = false; ST.autoTrialRunning = false
 	ST.trialInProgress = false; ST.trialCollecting = false
-
-	-- 2. Cancel current tween INSTANTLY
 	stopTween()
 	stopContinuousTracker()
 	resetRarityTracker()
 	restorePreviousSelections()
-
-	-- 3. Freeze character in place
 	if rootPart and rootPart.Parent then
 		rootPart.Velocity = Vector3.zero; rootPart.AssemblyLinearVelocity = Vector3.zero; rootPart.AssemblyAngularVelocity = Vector3.zero
 	end
-
-	-- 4. Update button immediately
 	if UI.ToggleBtn then UI.ToggleBtn.Text = "RETURNING..."; UI.ToggleBtn.BackgroundColor3 = Color3.fromRGB(200,160,0) end
 	if UI.StatusLabel then UI.StatusLabel.Text = "Returning..." end
 	if UI.TrialStatusLabel then UI.TrialStatusLabel.Text = "Trial: OFF"; UI.TrialStatusLabel.TextColor3 = Color3.fromRGB(180,180,180) end
 	if ST.savedTrialTab then switchTab(ST.savedTrialTab); ST.savedTrialTab = nil end
-
-	-- 5. Smooth return underground then cleanup
 	task.spawn(function()
 		if ST.savedCFrame and rootPart and rootPart.Parent then
 			smoothReturnToSaved()
 			task.wait(0.2)
 		end
-
-		-- 6. Full cleanup after return
 		ST.returning = false
 		unlockPhysics()
 		disableNoclip()
 		restoreFloors()
 		updateFloorLabel()
-
 		if UI.ToggleBtn then UI.ToggleBtn.Text = "START"; UI.ToggleBtn.BackgroundColor3 = Color3.fromRGB(40,140,40) end
 		if UI.StatusLabel then UI.StatusLabel.Text = "Stopped" end
 		if UI.PhaseLabel then UI.PhaseLabel.Text = "--" end
@@ -547,7 +815,7 @@ switchTab=function(tab) ST.activeTab=tab
 	else UI.brainrotTabBtn.BackgroundColor3=Color3.fromRGB(40,40,60); UI.brainrotTabBtn.TextColor3=Color3.fromRGB(150,150,150); UI.luckyBlockTabBtn.BackgroundColor3=Color3.fromRGB(200,160,0); UI.luckyBlockTabBtn.TextColor3=Color3.new(1,1,1); UI.BrainrotScrollFrame.Visible=false; UI.LuckyBlockScrollFrame.Visible=true; Title.Text="Lucky Block TP"; uiStroke.Color=Color3.fromRGB(200,160,0) end end
 UI.brainrotTabBtn.MouseButton1Click:Connect(function() switchTab("Brainrot") end); UI.luckyBlockTabBtn.MouseButton1Click:Connect(function() switchTab("LuckyBlocks") end)
 
-local RARITY_ORDER_C={{"uncommon",Color3.fromRGB(80,200,80)},{"common",Color3.fromRGB(180,180,180)},{"rare",Color3.fromRGB(60,120,255)},{"epic",Color3.fromRGB(180,60,255)},{"legendary",Color3.fromRGB(255,180,0)},{"mythic",Color3.fromRGB(255,50,50)},{"secret",Color3.fromRGB(255,0,100)},{"divine",Color3.fromRGB(255,220,100)}}
+local RARITY_ORDER_C={{"common",Color3.fromRGB(180,180,180)},{"uncommon",Color3.fromRGB(80,200,80)},{"rare",Color3.fromRGB(60,120,255)},{"epic",Color3.fromRGB(180,60,255)},{"legendary",Color3.fromRGB(255,180,0)},{"mythic",Color3.fromRGB(255,50,50)},{"mythical",Color3.fromRGB(255,80,80)},{"secret",Color3.fromRGB(255,0,100)},{"divine",Color3.fromRGB(255,220,100)},{"celestial",Color3.fromRGB(180,255,255)}}
 local function getRarityColor(n) local l=string.lower(n); for _,p in ipairs(RARITY_ORDER_C) do if string.find(l,p[1]) then return p[2] end end; return Color3.fromRGB(200,200,200) end
 
 local function createBrainrotCheckbox(rn,idx)
@@ -593,27 +861,50 @@ createToggle("Auto Return",true,Color3.fromRGB(100,255,180),function(v) ST.autoR
 createToggle("Wave Safety",true,Color3.fromRGB(255,100,100),function(v) ST.waveCheckEnabled=v end)
 createToggle("Clear Floors",true,Color3.fromRGB(255,160,60),function(v) ST.floorClearEnabled=v; if not v then restoreFloors(); updateFloorLabel() end end)
 
---// ===================== PICKUP ===================== --
+--// ===================== PICKUP (uses fullGrabObject) ===================== --
 local function pickupOneBrainrot(target)
-	if not target.Part or not target.Part.Parent or not target.Object or not target.Object.Parent then return false end; refreshChar()
-	local tp=target.Part.CFrame.Position
+	if not target.Part or not target.Part.Parent or not target.Object or not target.Object.Parent then return false end
+	refreshChar()
+	local tp = target.Part.CFrame.Position
+	local objectRef = target.Object
+
 	smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED); task.wait(0.05)
 	if not ST.autoTrialEnabled then return false end
 	smoothTween(CFrame.new(tp.X,tp.Y+CFG.TRAVEL_DEPTH,tp.Z),CFG.TWEEN_SPEED); task.wait(0.05)
 	if not ST.autoTrialEnabled or not target.Part or not target.Part.Parent then return false end
-	local fp=target.Part.CFrame.Position
-	if ST.waveCheckEnabled and isWaveApproaching(fp,CFG.WAVE_SAFE_DISTANCE) then waitForWavesToClear(fp,function() end); if not ST.autoTrialEnabled or not target.Part or not target.Part.Parent then return false end; task.wait(0.2) end
-	if not target.Part or not target.Part.Parent then return false end; local fp2=target.Part.CFrame.Position
+
+	local fp = target.Part.CFrame.Position
+	if ST.waveCheckEnabled and isWaveApproaching(fp,CFG.WAVE_SAFE_DISTANCE) then
+		waitForWavesToClear(fp,function() end)
+		if not ST.autoTrialEnabled or not target.Part or not target.Part.Parent then return false end
+		task.wait(0.2)
+	end
+	if not target.Part or not target.Part.Parent then return false end
+
+	local fp2 = target.Part.CFrame.Position
 	smoothTween(CFrame.new(fp2.X,fp2.Y+CFG.GRAB_HEIGHT,fp2.Z),CFG.RISE_SPEED)
-	if ST.waveCheckEnabled and isWaveNearby(rootPart.Position,CFG.WAVE_SAFE_DISTANCE*0.5) then smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED*2); task.wait(0.5); return false end
-	if target.Part and target.Part.Parent then if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce=Vector3.zero end
-		rootPart.CFrame=target.Part.CFrame*CFrame.new(0,2,0); rootPart.Velocity=Vector3.zero; rootPart.AssemblyLinearVelocity=Vector3.zero; task.wait(0.05)
-		if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce=Vector3.new(1e9,1e9,1e9); ST.bodyVel.Velocity=Vector3.zero end end
-	grabAllPrompts(target.Object); grabNearbyPrompts(tp,15)
-	pcall(function() for _,p in pairs(target.Object:GetDescendants()) do if p:IsA("BasePart") then firetouchinterest(rootPart,p,0); task.wait(); firetouchinterest(rootPart,p,1) end end
-		if target.Part and target.Part.Parent then firetouchinterest(rootPart,target.Part,0); task.wait(); firetouchinterest(rootPart,target.Part,1) end end)
-	pcall(function() for _,d in pairs(target.Object:GetDescendants()) do if d:IsA("ClickDetector") then fireclickdetector(d) end end end)
-	task.wait(CFG.WAIT_AT_TARGET); return true end
+
+	if ST.waveCheckEnabled and isWaveNearby(rootPart.Position,CFG.WAVE_SAFE_DISTANCE*0.5) then
+		smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED*2)
+		task.wait(0.5); return false
+	end
+
+	fullGrabObject(target.Object, target.Part, tp)
+
+	task.wait(0.5)
+	if objectRef and objectRef.Parent ~= nil then
+		if UI.PhaseLabel then UI.PhaseLabel.Text = "Retry grab..." end
+		fullGrabObject(objectRef, target.Part and target.Part.Parent and target.Part or nil, tp)
+		task.wait(0.5)
+		if objectRef and objectRef.Parent ~= nil then
+			if UI.PhaseLabel then UI.PhaseLabel.Text = "Grab failed!" end
+			if UI.LogLabel then UI.LogLabel.Text = "Miss: "..target.Name end
+			return false
+		end
+	end
+
+	return true
+end
 
 --// ===================== TRIAL ===================== --
 local function doOneTrialRun()
@@ -634,12 +925,27 @@ local function doOneTrialRun()
 		if #it==0 then task.wait(1.5); if not isTrialTimerActive() and not scanTrialFromBillboard() then
 			stopContinuousTracker(); restorePreviousSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress=false; ST.trialCollecting=false; return true,"completed" end; continue end
 		local bc,at=0,0
-		while bc<CFG.TRIAL_BATCH_SIZE and at<CFG.TRIAL_BATCH_SIZE+2 do at+=1
-			if not ST.autoTrialEnabled or (tick()-ts)>=CFG.TRIAL_TIME_LIMIT then break end; refreshChar()
+		while bc<CFG.TRIAL_BATCH_SIZE and at<CFG.TRIAL_BATCH_SIZE+4 do at+=1
+			if not ST.autoTrialEnabled or (tick()-ts)>=CFG.TRIAL_TIME_LIMIT then break end
+			refreshChar()
 			local bt=getBrainrots({ST.currentTrialFolder}); if #bt==0 then break end
-			local tg=nil; for _,t in ipairs(bt) do if t.Part and t.Part.Parent and t.Object and t.Object.Parent then tg=t; break end end; if not tg then break end
-			if pickupOneBrainrot(tg) then bc+=1; ST.trialGrabbed+=1; ST.totalGrabbed+=1; UI.GrabLabel.Text="Grabbed: "..ST.totalGrabbed end
-			if not ST.autoTrialEnabled then break end; task.wait(0.1) end
+			local tg=nil
+			for _,t in ipairs(bt) do
+				if t.Part and t.Part.Parent and t.Object and t.Object.Parent then tg=t; break end
+			end
+			if not tg then break end
+			if UI.PhaseLabel then UI.PhaseLabel.Text = "Grabbing: "..tg.Name end
+			local grabbed = pickupOneBrainrot(tg)
+			if grabbed then
+				bc+=1; ST.trialGrabbed+=1; ST.totalGrabbed+=1
+				UI.GrabLabel.Text="Grabbed: "..ST.totalGrabbed
+				if UI.LogLabel then UI.LogLabel.Text = "Got: "..tg.Name end
+			else
+				task.wait(0.3)
+			end
+			if not ST.autoTrialEnabled then break end
+			task.wait(0.1)
+		end
 		if bc>0 then travelToTower(); task.wait(0.2)
 			for dn=1,bc+1 do fireTrialPrompt(); task.wait(0.3); if not ST.autoTrialEnabled then break end end
 			if not ST.autoTrialEnabled then break end
@@ -672,7 +978,6 @@ createToggle("Auto Trial Tsunami",false,Color3.fromRGB(0,180,255),function(v) if
 --// ===================== BUTTONS ===================== --
 local function createButton(t,c) local b=Instance.new("TextButton"); b.Size=UDim2.new(0.48,-2,0,btnHeight); b.BackgroundColor3=c; b.BorderSizePixel=0; b.Text=t; b.TextColor3=Color3.new(1,1,1); b.TextSize=isMobile and 9 or 13; b.Font=Enum.Font.GothamBold; Instance.new("UICorner",b).CornerRadius=UDim.new(0,8); return b end
 
--- TOGGLE BUTTON
 do local row=Instance.new("Frame"); row.Size=UDim2.new(1,-16,0,btnHeight); row.Position=UDim2.new(0,8,0,yOff); row.BackgroundTransparency=1; row.Parent=contentFrame; yOff+=btnHeight+(isMobile and 2 or 3)
 	UI.ToggleBtn=Instance.new("TextButton"); UI.ToggleBtn.Size=UDim2.new(1,0,1,0); UI.ToggleBtn.Position=UDim2.new(0,0,0,0); UI.ToggleBtn.BackgroundColor3=Color3.fromRGB(40,140,40); UI.ToggleBtn.BorderSizePixel=0; UI.ToggleBtn.Text="START"; UI.ToggleBtn.TextColor3=Color3.new(1,1,1); UI.ToggleBtn.TextSize=isMobile and 11 or 16; UI.ToggleBtn.Font=Enum.Font.GothamBold; UI.ToggleBtn.Parent=row; Instance.new("UICorner",UI.ToggleBtn).CornerRadius=UDim.new(0,8) end
 
@@ -704,8 +1009,19 @@ do local lf=Instance.new("Frame"); lf.Size=UDim2.new(1,-16,0,isMobile and 22 or 
 
 contentFrame.CanvasSize=UDim2.new(0,0,0,yOff+10)
 RunService.Heartbeat:Connect(function() if rootPart and rootPart.Parent then updateWaveStatus(rootPart.Position) end end)
-player.CharacterAdded:Connect(function(char) character=char; humanoid=char:WaitForChild("Humanoid"); rootPart=char:WaitForChild("HumanoidRootPart")
-	if ST.running or ST.autoTrialRunning or ST.returning then task.wait(0.5); enableNoclip(); lockPhysics() end end)
+player.CharacterAdded:Connect(function(char)
+	ST.respawning = true
+	stopTween()
+	character = char
+	humanoid = char:WaitForChild("Humanoid")
+	rootPart = char:WaitForChild("HumanoidRootPart")
+	task.wait(2.5)
+	ST.respawning = false
+	if ST.running or ST.autoTrialRunning or ST.returning then
+		enableNoclip(); lockPhysics()
+		if UI.StatusLabel then UI.StatusLabel.Text = "Respawned - resuming..." end
+	end
+end)
 
 local function refreshBrainrotFolders()
 	for _,d in pairs(ST.brainrotCheckboxes) do d.Button:Destroy() end; ST.brainrotCheckboxes={}
@@ -721,7 +1037,59 @@ local function refreshLuckyBlockRarities()
 		UI.LuckyBlockScrollFrame.CanvasSize=UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8) end; return #r end
 local function refreshActiveTab() if ST.activeTab=="Brainrot" then UI.StatusLabel.Text="Found "..refreshBrainrotFolders().." folders" else UI.StatusLabel.Text="Found "..refreshLuckyBlockRarities().." rarities" end; updateFloorLabel() end
 
---// ===================== FARMING ===================== --
+local function getSnapshotKey(tbl) local keys={}; for k in pairs(tbl) do table.insert(keys,k) end; table.sort(keys); return table.concat(keys,"|") end
+local function startAutoRefresh()
+	task.spawn(function()
+		local lastBrainrotKey = ""
+		local lastLuckyKey = ""
+		while ScreenGui and ScreenGui.Parent do
+			local brainrotFolders = scanRarityFolders()
+			local brainrotKey = table.concat(brainrotFolders, "|")
+			local luckyRarities = scanLuckyBlockRarities()
+			local luckyKey = table.concat(luckyRarities, "|")
+
+			if brainrotKey ~= lastBrainrotKey then
+				local saved = {}; for n,v in pairs(ST.brainrotSelectedRarities) do saved[n]=v end
+				refreshBrainrotFolders()
+				for n,v in pairs(saved) do
+					if v and ST.brainrotCheckboxes[n] then
+						ST.brainrotSelectedRarities[n]=true
+						ST.brainrotCheckboxes[n].Check.Text="Y"
+						ST.brainrotCheckboxes[n].Check.BackgroundColor3=Color3.fromRGB(40,100,40)
+					end
+				end
+				lastBrainrotKey = brainrotKey
+			else
+				for n,d in pairs(ST.brainrotCheckboxes) do
+					local f=CFG.BRAINROT_PATH:FindFirstChild(n)
+					d.CountLabel.Text = f and tostring(#f:GetChildren()) or "0"
+				end
+			end
+
+			if luckyKey ~= lastLuckyKey then
+				local saved = {}; for n,v in pairs(ST.luckyBlockSelectedRarities) do saved[n]=v end
+				refreshLuckyBlockRarities()
+				for n,v in pairs(saved) do
+					if v and ST.luckyBlockCheckboxes[n] then
+						ST.luckyBlockSelectedRarities[n]=true
+						ST.luckyBlockCheckboxes[n].Check.Text="Y"
+						ST.luckyBlockCheckboxes[n].Check.BackgroundColor3=Color3.fromRGB(100,80,0)
+					end
+				end
+				lastLuckyKey = luckyKey
+			else
+				for n,d in pairs(ST.luckyBlockCheckboxes) do
+					d.CountLabel.Text = tostring(getLuckyBlockRarityCount(n))
+				end
+			end
+
+			updateFloorLabel()
+			task.wait(1)
+		end
+	end)
+end
+
+--// ===================== FARMING (uses fullGrabObject) ===================== --
 local function startFarming()
 	if ST.running or ST.returning then return end; ST.running=true; ST.farmingTab=ST.activeTab
 	if not ST.savedCFrame then saveCurrentPosition(); updateSavedPosLabel(); UI.LogLabel.Text="Auto-saved" end
@@ -748,20 +1116,13 @@ local function startFarming()
 				if not smoothTween(CFrame.new(fp2.X,fp2.Y+CFG.GRAB_HEIGHT,fp2.Z),CFG.RISE_SPEED) then break end; if not ST.running then break end
 				if ST.waveCheckEnabled and isWaveNearby(rootPart.Position,CFG.WAVE_SAFE_DISTANCE*0.5) then smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED*2); task.wait(0.5); continue end
 				UI.PhaseLabel.Text="Grabbing!"
-				if target.Part and target.Part.Parent then if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce=Vector3.zero end
-					rootPart.CFrame=target.Part.CFrame*CFrame.new(0,2,0); rootPart.Velocity=Vector3.zero; rootPart.AssemblyLinearVelocity=Vector3.zero; task.wait(0.05)
-					if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce=Vector3.new(1e9,1e9,1e9); ST.bodyVel.Velocity=Vector3.zero end end
-				local pc=grabAllPrompts(target.Object)+grabNearbyPrompts(tp,15)
-				pcall(function() for _,p in pairs(target.Object:GetDescendants()) do if p:IsA("BasePart") then firetouchinterest(rootPart,p,0); task.wait(); firetouchinterest(rootPart,p,1) end end
-					if target.Part and target.Part.Parent then firetouchinterest(rootPart,target.Part,0); task.wait(); firetouchinterest(rootPart,target.Part,1) end end)
-				pcall(function() for _,d in pairs(target.Object:GetDescendants()) do if d:IsA("ClickDetector") then fireclickdetector(d) end end end)
-				ST.totalGrabbed+=1; UI.GrabLabel.Text="Grabbed: "..ST.totalGrabbed; UI.LogLabel.Text="["..target.Rarity.."] "..target.Name.." (+"..pc..")"
+				fullGrabObject(target.Object, target.Part, tp)
+				ST.totalGrabbed+=1; UI.GrabLabel.Text="Grabbed: "..ST.totalGrabbed; UI.LogLabel.Text="["..target.Rarity.."] "..target.Name
 				task.wait(CFG.WAIT_AT_TARGET); if not ST.running then break end
 				UI.PhaseLabel.Text="Diving..."; refreshChar()
 				smoothTween(CFrame.new(rootPart.Position.X,rootPart.Position.Y+CFG.TRAVEL_DEPTH,rootPart.Position.Z),CFG.DIVE_SPEED); task.wait(0.05)
 			end
 			if not ST.running then break end; if not CFG.AUTO_LOOP then ST.running=false; break end; task.wait(0.3) end
-		-- Loop ended, cleanup happens in instantStopAndReturn or naturally
 		if not ST.returning and not ST.autoTrialRunning then
 			restoreFloors(); updateFloorLabel(); unlockPhysics(); disableNoclip()
 			UI.ToggleBtn.Text="START"; UI.ToggleBtn.BackgroundColor3=Color3.fromRGB(40,140,40); UI.StatusLabel.Text="Stopped"; UI.PhaseLabel.Text="--" end
@@ -788,15 +1149,12 @@ UI.SavePosBtn.MouseButton1Click:Connect(function()
 	if saveCurrentPosition() then updateSavedPosLabel(); UI.LogLabel.Text="Saved!"
 		UI.SavePosBtn.BackgroundColor3=Color3.fromRGB(40,180,40); task.delay(0.5,function() UI.SavePosBtn.BackgroundColor3=Color3.fromRGB(180,120,0) end) end end)
 
--- RETURN BUTTON - stops everything then returns underground
 UI.ReturnBtn.MouseButton1Click:Connect(function()
 	if not ST.savedCFrame then UI.LogLabel.Text="No saved pos!"; return end
-	if ST.returning then return end -- already returning
+	if ST.returning then return end
 	if ST.running or ST.autoTrialRunning then
-		-- Stop farming/trial first, then return
 		instantStopAndReturn()
 	else
-		-- Not running, just do a smooth return
 		task.spawn(function()
 			ST.returning = true
 			if UI.StatusLabel then UI.StatusLabel.Text = "Returning..." end
@@ -815,12 +1173,8 @@ UI.ReturnBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
-CFG.BRAINROT_PATH.ChildAdded:Connect(function() task.wait(0.5); for n,d in pairs(ST.brainrotCheckboxes) do local f=CFG.BRAINROT_PATH:FindFirstChild(n); d.CountLabel.Text=f and tostring(#f:GetChildren()) or "0" end end)
-CFG.BRAINROT_PATH.ChildRemoved:Connect(function() task.wait(0.5); for n,d in pairs(ST.brainrotCheckboxes) do local f=CFG.BRAINROT_PATH:FindFirstChild(n); d.CountLabel.Text=f and tostring(#f:GetChildren()) or "0" end end)
-CFG.LUCKYBLOCK_PATH.ChildAdded:Connect(function() task.wait(0.5); for n,d in pairs(ST.luckyBlockCheckboxes) do d.CountLabel.Text=tostring(getLuckyBlockRarityCount(n)) end end)
-CFG.LUCKYBLOCK_PATH.ChildRemoved:Connect(function() task.wait(0.5); for n,d in pairs(ST.luckyBlockCheckboxes) do d.CountLabel.Text=tostring(getLuckyBlockRarityCount(n)) end end)
-
 startMapWatcher(); refreshBrainrotFolders(); refreshLuckyBlockRarities(); switchTab("Brainrot")
 UI.StatusLabel.Text="Ready - select & START"; UI.PhaseLabel.Text="--"; updateSavedPosLabel(); updateTrackerLabel(); updateFloorLabel()
+startAutoRefresh()
 
 end
