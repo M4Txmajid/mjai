@@ -150,7 +150,7 @@ function Fn.EnableFly()
         local moveDir = Vector3.zero
 
        if State.IsMobile then
-            local hum2 = char2:FindFirstChildOfClass("Humanoid")
+            local hum2 = char2 and char2:FindFirstChildOfClass("Humanoid")
             if hum2 and hum2.MoveDirection.Magnitude > 0 then
                 local md = hum2.MoveDirection
                 -- Horizontal movement relative to camera
