@@ -149,40 +149,20 @@ function Fn.EnableFly()
         local cam = workspace.CurrentCamera
         local moveDir = Vector3.zero
 
-        if State.IsMobile then
-            -- Read humanoid move direction (driven by mobile thumbstick)
+       if State.IsMobile then
             local hum2 = char2:FindFirstChildOfClass("Humanoid")
             if hum2 and hum2.MoveDirection.Magnitude > 0 then
-                moveDir = moveDir + hum2.MoveDirection
+                local md = hum2.MoveDirection
+                -- Horizontal movement relative to camera
+                local camRight = Vector3.new(cam.CFrame.RightVector.X, 0, cam.CFrame.RightVector.Z)
+                local camForward = Vector3.new(cam.CFrame.LookVector.X, 0, cam.CFrame.LookVector.Z)
+                if camRight.Magnitude > 0 then camRight = camRight.Unit end
+                if camForward.Magnitude > 0 then camForward = camForward.Unit end
+                moveDir = moveDir + camForward * md.Z * -1 + camRight * md.X
+                -- Joystick Z axis: pushed forward (md.Z negative) = fly up
+                -- pushed backward (md.Z positive) = fly down
+                moveDir = moveDir + Vector3.new(0, -md.Z * md.Magnitude, 0)
             end
-            -- Up/down via on-screen jump button and a down button we'll add
-            if _UserInputService:IsKeyDown(Enum.KeyCode.ButtonA) then
-                moveDir = moveDir + Vector3.new(0, 1, 0)
-            end
-            -- Tap jump = go up
-            if hum2 and hum2.Jump then
-                moveDir = moveDir + Vector3.new(0, 1, 0)
-            end
-        else
-            if _UserInputService:IsKeyDown(Enum.KeyCode.W) then
-                moveDir = moveDir + cam.CFrame.LookVector
-            end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.S) then
-                moveDir = moveDir - cam.CFrame.LookVector
-            end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.A) then
-                moveDir = moveDir - cam.CFrame.RightVector
-            end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.D) then
-                moveDir = moveDir + cam.CFrame.RightVector
-            end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-                moveDir = moveDir + Vector3.new(0, 1, 0)
-            end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-                moveDir = moveDir - Vector3.new(0, 1, 0)
-            end
-        end
 
         local targetVel
         if moveDir.Magnitude > 0 then
