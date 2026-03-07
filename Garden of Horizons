@@ -2817,10 +2817,16 @@ Fn.Sep(P, "FLY")
             local moveDir = Vector3.zero
 
             if State.IsMobile then
-                local forward = cam.CFrame.LookVector  * -fly_joystickInput.Y
-                local right   = cam.CFrame.RightVector *  fly_joystickInput.X
-                local vert    = Vector3.new(0, fly_verticalInput, 0)
-                moveDir = forward + right + vert
+                local char2 = LP.Character
+                if char2 then
+                    local hum2 = char2:FindFirstChildOfClass("Humanoid")
+                    if hum2 then
+                        local md = hum2.MoveDirection
+                        if md.Magnitude > 0 then
+                            moveDir = md
+                        end
+                    end
+                end
             else
                 if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
                 if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
@@ -2830,7 +2836,6 @@ Fn.Sep(P, "FLY")
                 if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
                 or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0,1,0) end
             end
-
             if moveDir.Magnitude > 0 then
                 FlyState.bodyVelocity.Velocity = moveDir.Unit * FlyState.speed
             else
