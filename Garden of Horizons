@@ -92,226 +92,6 @@ getgenv().BrainrotESP_Objects = ESPObjects
 -- ════════════════════════════════════════
 
 
-local FlyState = {
-    enabled = false,
-    speed = 60,
-    bodyVel = nil,
-    bodyGyro = nil,
-    connection = nil,
-}
-
-local mobileUpPressed = false
-local mobileDownPressed = false
-local mobileJoystickInput = Vector2.new(0, 0)
-
--- Mobile fly controls UI
-local FlyMobileControls = nil
-
-function Fn.EnableFly()
-    local _Players = game:GetService("Players")
-    local _RunService = game:GetService("RunService")
-    local _UserInputService = game:GetService("UserInputService")
-    local _TweenService = game:GetService("TweenService")
-
-    local LP2 = _Players.LocalPlayer
-    local char = LP2.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not hum then return end
-
-    FlyState.enabled = true
-    hum.PlatformStand = true
-
-    for _, o in pairs(hrp:GetChildren()) do
-        if o.Name == "_Fly_BV" or o.Name == "_Fly_BG" then o:Destroy() end
-    end
-
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "_Fly_BV"
-    bv.Velocity = Vector3.zero
-    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-    bv.P = 9e4
-    bv.Parent = hrp
-    FlyState.bodyVel = bv
-
-    local bg = Instance.new("BodyGyro")
-    bg.Name = "_Fly_BG"
-    bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-    bg.P = 9e4
-    bg.D = 100
-    bg.CFrame = hrp.CFrame
-    bg.Parent = hrp
-    FlyState.bodyGyro = bg
-
-    -- Build mobile controls
-    if State.IsMobile then
-        FlyMobileControls = Instance.new("Frame")
-        FlyMobileControls.Size = UDim2.new(1, 0, 0, 200)
-        FlyMobileControls.Position = UDim2.new(0, 0, 1, -210)
-        FlyMobileControls.BackgroundTransparency = 1
-        FlyMobileControls.Parent = Gui
-
-        -- Joystick base
-        local JoyBase = Instance.new("Frame")
-        JoyBase.Size = UDim2.new(0, 140, 0, 140)
-        JoyBase.Position = UDim2.new(0, 30, 0.5, -70)
-        JoyBase.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-        JoyBase.BackgroundTransparency = 0.3
-        JoyBase.BorderSizePixel = 0
-        JoyBase.Parent = FlyMobileControls
-        Fn.Corner(JoyBase, 999)
-        Fn.Border(JoyBase, C.Accent, 2)
-
-        local JoyInner = Instance.new("Frame")
-        JoyInner.Size = UDim2.new(0, 60, 0, 60)
-        JoyInner.Position = UDim2.new(0.5, -30, 0.5, -30)
-        JoyInner.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        JoyInner.BackgroundTransparency = 0.2
-        JoyInner.BorderSizePixel = 0
-        JoyInner.ZIndex = 2
-        JoyInner.Parent = JoyBase
-        Fn.Corner(JoyInner, 999)
-
-        -- Up button
-        local UpBtn = Instance.new("TextButton")
-        UpBtn.Size = UDim2.new(0, 80, 0, 75)
-        UpBtn.Position = UDim2.new(1, -110, 0, 0)
-        UpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 100)
-        UpBtn.BackgroundTransparency = 0.3
-        UpBtn.Text = "⬆️"
-        UpBtn.TextSize = 32
-        UpBtn.Font = Enum.Font.GothamBold
-        UpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        UpBtn.BorderSizePixel = 0
-        UpBtn.Parent = FlyMobileControls
-        Fn.Corner(UpBtn, 15)
-
-        -- Down button
-        local DwnBtn = Instance.new("TextButton")
-        DwnBtn.Size = UDim2.new(0, 80, 0, 75)
-        DwnBtn.Position = UDim2.new(1, -110, 0, 95)
-        DwnBtn.BackgroundColor3 = Color3.fromRGB(180, 80, 80)
-        DwnBtn.BackgroundTransparency = 0.3
-        DwnBtn.Text = "⬇️"
-        DwnBtn.TextSize = 32
-        DwnBtn.Font = Enum.Font.GothamBold
-        DwnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-        DwnBtn.BorderSizePixel = 0
-        DwnBtn.Parent = FlyMobileControls
-        Fn.Corner(DwnBtn, 15)
-
-        -- Joystick logic
-        local joystickActive = false
-        local maxRadius = 40
-
-        local function updateJoy(pos)
-            local center = JoyBase.AbsolutePosition + JoyBase.AbsoluteSize / 2
-            local offset = Vector2.new(pos.X - center.X, pos.Y - center.Y)
-            local dist = math.min(offset.Magnitude, maxRadius)
-            local dir = offset.Magnitude > 0 and offset.Unit or Vector2.new(0, 0)
-            local clamped = dir * dist
-            JoyInner.Position = UDim2.new(0.5, clamped.X - 30, 0.5, clamped.Y - 30)
-            mobileJoystickInput = Vector2.new(clamped.X / maxRadius, clamped.Y / maxRadius)
-        end
-
-        local function resetJoy()
-            joystickActive = false
-            mobileJoystickInput = Vector2.new(0, 0)
-            _TweenService:Create(JoyInner, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
-                Position = UDim2.new(0.5, -30, 0.5, -30)
-            }):Play()
-        end
-
-        JoyBase.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Touch then
-                joystickActive = true
-                updateJoy(i.Position)
-            end
-        end)
-        JoyBase.InputChanged:Connect(function(i)
-            if joystickActive and i.UserInputType == Enum.UserInputType.Touch then
-                updateJoy(i.Position)
-            end
-        end)
-        JoyBase.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Touch then resetJoy() end
-        end)
-        _UserInputService.TouchMoved:Connect(function(t)
-            if joystickActive then updateJoy(t.Position) end
-        end)
-        _UserInputService.TouchEnded:Connect(function()
-            if joystickActive then resetJoy() end
-        end)
-
-        -- Up/Down buttons
-        UpBtn.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Touch then mobileUpPressed = true end
-        end)
-        UpBtn.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Touch then mobileUpPressed = false end
-        end)
-        DwnBtn.InputBegan:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Touch then mobileDownPressed = true end
-        end)
-        DwnBtn.InputEnded:Connect(function(i)
-            if i.UserInputType == Enum.UserInputType.Touch then mobileDownPressed = false end
-        end)
-    end
-
-    if FlyState.connection then FlyState.connection:Disconnect() end
-    FlyState.connection = _RunService.Heartbeat:Connect(function()
-        if not FlyState.enabled then return end
-        local char2 = LP2.Character
-        if not char2 then return end
-        local hrp2 = char2:FindFirstChild("HumanoidRootPart")
-        if not hrp2 then return end
-
-        local cam = workspace.CurrentCamera
-        local moveDir = Vector3.zero
-
-        if State.IsMobile then
-            local forward = cam.CFrame.LookVector * -mobileJoystickInput.Y
-            local right = cam.CFrame.RightVector * mobileJoystickInput.X
-            local vert = Vector3.new(0, (mobileUpPressed and 1 or 0) - (mobileDownPressed and 1 or 0), 0)
-            moveDir = forward + right + vert
-        else
-            if _UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
-            if _UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
-        end
-
-        if moveDir.Magnitude > 0 then
-            bv.Velocity = moveDir.Unit * FlyState.speed
-        else
-            bv.Velocity = Vector3.zero
-        end
-
-        bg.CFrame = cam.CFrame
-    end)
-end
-
-function Fn.DisableFly()
-    local LP = game:GetService("Players").LocalPlayer
-    FlyState.enabled = false
-    mobileUpPressed = false
-    mobileDownPressed = false
-    mobileJoystickInput = Vector2.new(0, 0)
-
-    if FlyState.connection then FlyState.connection:Disconnect() FlyState.connection = nil end
-    if FlyState.bodyVel and FlyState.bodyVel.Parent then FlyState.bodyVel:Destroy() FlyState.bodyVel = nil end
-    if FlyState.bodyGyro and FlyState.bodyGyro.Parent then FlyState.bodyGyro:Destroy() FlyState.bodyGyro = nil end
-    if FlyMobileControls then FlyMobileControls:Destroy() FlyMobileControls = nil end
-
-    local char = LP.Character
-    if char then
-        local hum = char:FindFirstChildOfClass("Humanoid")
-        if hum then hum.PlatformStand = false end
-    end
-end
 local GodState = {
     enabled         = false,
     DEPTH           = -5,
@@ -345,10 +125,6 @@ local UserInputService = game:GetService("UserInputService")
 local LP               = Players.LocalPlayer
 local Camera           = workspace.CurrentCamera
 
-LP.CharacterAdded:Connect(function()
-    task.wait(1)
-    if FlyState.enabled then Fn.EnableFly() end
-end)
 
 -- ─── MOBILE DETECT ───────────────────────────────────────────────────────────
 do 
@@ -2952,13 +2728,284 @@ do
         end
     end, C.GodGold)
 
-    Fn.Sep(P, "FLY")
-    Fn.Toggle(P, "Fly", "WASD to move, Space = up, Shift = down", false, function(s)
-        if s then Fn.EnableFly() else Fn.DisableFly() end
+
+
+
+Fn.Sep(P, "FLY")
+
+    -- ── FLY STATE ──────────────────────────────────────────────
+    local FlyState = {
+        enabled = false,
+        speed = 100,
+        bodyGyro = nil,
+        bodyVelocity = nil,
+        connection = nil,
+    }
+
+    local fly_upPressed    = false
+    local fly_downPressed  = false
+    local fly_joystickInput = Vector2.new(0, 0)
+    local fly_joystickActive = false
+    local fly_verticalInput = 0
+    local FlyMobileFrame = nil
+
+    local function StopFly()
+        FlyState.enabled = false
+        if FlyState.connection then FlyState.connection:Disconnect() FlyState.connection = nil end
+        if FlyState.bodyVelocity and FlyState.bodyVelocity.Parent then FlyState.bodyVelocity:Destroy() FlyState.bodyVelocity = nil end
+        if FlyState.bodyGyro and FlyState.bodyGyro.Parent then FlyState.bodyGyro:Destroy() FlyState.bodyGyro = nil end
+        local char = LP.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then hum.PlatformStand = false end
+        end
+        if FlyMobileFrame and FlyMobileFrame.Parent then
+            TweenService:Create(FlyMobileFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+                Position = UDim2.new(0, 0, 1, 10)
+            }):Play()
+            task.delay(0.35, function()
+                if FlyMobileFrame then FlyMobileFrame.Visible = false end
+            end)
+        end
+    end
+
+    local function StartFly()
+        local char = LP.Character
+        if not char then return end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not hum then return end
+
+        FlyState.enabled = true
+
+        for _, o in pairs(hrp:GetChildren()) do
+            if o.Name == "_MD_FlyBG" or o.Name == "_MD_FlyBV" then o:Destroy() end
+        end
+
+        local bg = Instance.new("BodyGyro")
+        bg.Name = "_MD_FlyBG"
+        bg.P = 9e4
+        bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+        bg.CFrame = hrp.CFrame
+        bg.Parent = hrp
+        FlyState.bodyGyro = bg
+
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = "_MD_FlyBV"
+        bv.Velocity = Vector3.zero
+        bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bv.Parent = hrp
+        FlyState.bodyVelocity = bv
+
+        if State.IsMobile and FlyMobileFrame then
+            FlyMobileFrame.Visible = true
+            FlyMobileFrame.Position = UDim2.new(0, 0, 1, 10)
+            TweenService:Create(FlyMobileFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+                Position = UDim2.new(0, 0, 1, -210)
+            }):Play()
+        end
+
+        if FlyState.connection then FlyState.connection:Disconnect() end
+        FlyState.connection = RunService.Heartbeat:Connect(function()
+            if not FlyState.enabled then return end
+            local char2 = LP.Character; if not char2 then return end
+            local hrp2 = char2:FindFirstChild("HumanoidRootPart"); if not hrp2 then return end
+            if not FlyState.bodyVelocity or not FlyState.bodyVelocity.Parent then return end
+            if not FlyState.bodyGyro    or not FlyState.bodyGyro.Parent    then return end
+
+            local cam = workspace.CurrentCamera
+            local moveDir = Vector3.zero
+
+            if State.IsMobile then
+                local forward = cam.CFrame.LookVector  * -fly_joystickInput.Y
+                local right   = cam.CFrame.RightVector *  fly_joystickInput.X
+                local vert    = Vector3.new(0, fly_verticalInput, 0)
+                moveDir = forward + right + vert
+            else
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+                if UserInputService:IsKeyDown(Enum.KeyCode.Space)      then moveDir = moveDir + Vector3.new(0,1,0) end
+                if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+                or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveDir = moveDir - Vector3.new(0,1,0) end
+            end
+
+            if moveDir.Magnitude > 0 then
+                FlyState.bodyVelocity.Velocity = moveDir.Unit * FlyState.speed
+            else
+                FlyState.bodyVelocity.Velocity = Vector3.zero
+            end
+            FlyState.bodyGyro.CFrame = cam.CFrame
+        end)
+    end
+
+    -- Toggle toggle widget
+    local flyToggleCard = Fn.Toggle(P, "Fly", "WASD + Space/Shift  •  [F] key on PC", false, function(s)
+        if s then StartFly() else StopFly() end
     end, C.GodGold)
-    Fn.Slider(P, "Fly Speed", 10, 300, 60, " studs/s", function(v)
+
+    Fn.Slider(P, "Fly Speed", 100, 400, 100, " studs/s", function(v)
         FlyState.speed = v
     end, C.GodGold)
+
+    -- F key shortcut (PC only)
+    if not State.IsMobile then
+        UserInputService.InputBegan:Connect(function(input, gp)
+            if gp then return end
+            if input.KeyCode == Enum.KeyCode.F then
+                FlyState.enabled = not FlyState.enabled
+                if FlyState.enabled then StartFly() else StopFly() end
+            end
+        end)
+    end
+
+    -- Respawn: restart fly if it was on
+    LP.CharacterAdded:Connect(function()
+        local wasFlying = FlyState.enabled
+        StopFly()
+        if wasFlying then
+            task.wait(1)
+            StartFly()
+        end
+    end)
+
+    -- ── MOBILE CONTROLS ────────────────────────────────────────
+    if State.IsMobile then
+        FlyMobileFrame = Instance.new("Frame")
+        FlyMobileFrame.Size = UDim2.new(1, 0, 0, 200)
+        FlyMobileFrame.Position = UDim2.new(0, 0, 1, 10)
+        FlyMobileFrame.BackgroundTransparency = 1
+        FlyMobileFrame.Visible = false
+        FlyMobileFrame.ZIndex = 50
+        FlyMobileFrame.Parent = Gui
+
+        -- Joystick base
+        local JoyBase = Instance.new("Frame")
+        JoyBase.Size = UDim2.new(0, 140, 0, 140)
+        JoyBase.Position = UDim2.new(0, 30, 0.5, -70)
+        JoyBase.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        JoyBase.BackgroundTransparency = 0.3
+        JoyBase.BorderSizePixel = 0
+        JoyBase.Parent = FlyMobileFrame
+        Fn.Corner(JoyBase, 999)
+        Fn.Border(JoyBase, C.GodGold, 2)
+
+        local JoyInner = Instance.new("Frame")
+        JoyInner.Size = UDim2.new(0, 60, 0, 60)
+        JoyInner.Position = UDim2.new(0.5, -30, 0.5, -30)
+        JoyInner.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        JoyInner.BackgroundTransparency = 0.2
+        JoyInner.BorderSizePixel = 0
+        JoyInner.ZIndex = 51
+        JoyInner.Parent = JoyBase
+        Fn.Corner(JoyInner, 999)
+
+        local UpBtn = Instance.new("TextButton")
+        UpBtn.Size = UDim2.new(0, 80, 0, 75)
+        UpBtn.Position = UDim2.new(1, -110, 0, 0)
+        UpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 100)
+        UpBtn.BackgroundTransparency = 0.3
+        UpBtn.Text = "⬆️"
+        UpBtn.TextSize = 32
+        UpBtn.Font = Enum.Font.GothamBold
+        UpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        UpBtn.BorderSizePixel = 0
+        UpBtn.ZIndex = 51
+        UpBtn.Parent = FlyMobileFrame
+        Fn.Corner(UpBtn, 15)
+
+        local DwnBtn = Instance.new("TextButton")
+        DwnBtn.Size = UDim2.new(0, 80, 0, 75)
+        DwnBtn.Position = UDim2.new(1, -110, 0, 95)
+        DwnBtn.BackgroundColor3 = Color3.fromRGB(180, 80, 80)
+        DwnBtn.BackgroundTransparency = 0.3
+        DwnBtn.Text = "⬇️"
+        DwnBtn.TextSize = 32
+        DwnBtn.Font = Enum.Font.GothamBold
+        DwnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        DwnBtn.BorderSizePixel = 0
+        DwnBtn.ZIndex = 51
+        DwnBtn.Parent = FlyMobileFrame
+        Fn.Corner(DwnBtn, 15)
+
+        -- Joystick logic
+        local maxRadius = 40
+
+        local function updateJoy(pos)
+            local center  = JoyBase.AbsolutePosition + JoyBase.AbsoluteSize / 2
+            local offset   = Vector2.new(pos.X - center.X, pos.Y - center.Y)
+            local dist     = math.min(offset.Magnitude, maxRadius)
+            local dir      = offset.Magnitude > 0 and offset.Unit or Vector2.new(0, 0)
+            local clamped  = dir * dist
+            JoyInner.Position  = UDim2.new(0.5, clamped.X - 30, 0.5, clamped.Y - 30)
+            fly_joystickInput  = Vector2.new(clamped.X / maxRadius, clamped.Y / maxRadius)
+        end
+
+        local function resetJoy()
+            fly_joystickActive = false
+            fly_joystickInput  = Vector2.new(0, 0)
+            TweenService:Create(JoyInner, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+                Position = UDim2.new(0.5, -30, 0.5, -30)
+            }):Play()
+        end
+
+        JoyBase.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then
+                fly_joystickActive = true
+                updateJoy(i.Position)
+            end
+        end)
+        JoyBase.InputChanged:Connect(function(i)
+            if fly_joystickActive and i.UserInputType == Enum.UserInputType.Touch then
+                updateJoy(i.Position)
+            end
+        end)
+        JoyBase.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then resetJoy() end
+        end)
+        UserInputService.TouchMoved:Connect(function(t)
+            if fly_joystickActive then updateJoy(t.Position) end
+        end)
+        UserInputService.TouchEnded:Connect(function()
+            if fly_joystickActive then resetJoy() end
+        end)
+
+        -- Up / Down buttons
+        UpBtn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then
+                fly_upPressed = true
+                fly_verticalInput = 1
+            end
+        end)
+        UpBtn.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then
+                fly_upPressed = false
+                if not fly_downPressed then fly_verticalInput = 0 end
+            end
+        end)
+        DwnBtn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then
+                fly_downPressed = true
+                fly_verticalInput = -1
+            end
+        end)
+        DwnBtn.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then
+                fly_downPressed = false
+                if not fly_upPressed then fly_verticalInput = 0 end
+            end
+        end)
+
+        -- Also hide mobile controls on character remove
+        LP.CharacterRemoving:Connect(function()
+            fly_joystickInput  = Vector2.new(0, 0)
+            fly_verticalInput  = 0
+            fly_upPressed      = false
+            fly_downPressed    = false
+        end)
+    end
+    
 
     Fn.Sep(P, "HOW IT WORKS")
     Fn.InfoCard(P, "Your real body is pushed underground by "..math.abs(GodState.DEPTH).." studs. A cloned fake body mirrors your animations visually. The server sees your real (underground) position.", C.TextMuted)
