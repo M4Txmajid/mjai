@@ -32,8 +32,8 @@ local State = {
     InstantGrabEnabled = false, GrabConnection = nil, BrainrotsFixed = 0,
     InstantLuckyBlockEnabled = false, LuckyBlockConnection = nil, LuckyBlocksFixed = 0,
     IsMobile = false, Scale = 1,
-    MainWidth = 620, MainHeight = 660,
-    HeaderHeight = 56, BtnHeight = 36, ToggleH = 38, CardPad = 10, FontMult = 1,
+    MainWidth = 420, MainHeight = 320,
+    HeaderHeight = 36, BtnHeight = 26, ToggleH = 28, CardPad = 10, FontMult = 1,
 }
 local C = {
     Base        = Color3.fromRGB(8,   8,   12),
@@ -100,8 +100,21 @@ local FlyState = {
     connection = nil,
 }
 
+local mobileUpPressed = false
+local mobileDownPressed = false
+local mobileJoystickInput = Vector2.new(0, 0)
+
+-- Mobile fly controls UI
+local FlyMobileControls = nil
+
 function Fn.EnableFly()
-    local char = LP.Character
+    local _Players = game:GetService("Players")
+    local _RunService = game:GetService("RunService")
+    local _UserInputService = game:GetService("UserInputService")
+    local _TweenService = game:GetService("TweenService")
+
+    local LP2 = _Players.LocalPlayer
+    local char = LP2.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local hum = char:FindFirstChildOfClass("Humanoid")
@@ -117,23 +130,139 @@ function Fn.EnableFly()
     local bv = Instance.new("BodyVelocity")
     bv.Name = "_Fly_BV"
     bv.Velocity = Vector3.zero
-    bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-    bv.P = 1e9
+    bv.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    bv.P = 9e4
     bv.Parent = hrp
     FlyState.bodyVel = bv
 
     local bg = Instance.new("BodyGyro")
     bg.Name = "_Fly_BG"
-    bg.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-    bg.P = 1e9
+    bg.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    bg.P = 9e4
+    bg.D = 100
     bg.CFrame = hrp.CFrame
     bg.Parent = hrp
     FlyState.bodyGyro = bg
 
+    -- Build mobile controls
+    if State.IsMobile then
+        FlyMobileControls = Instance.new("Frame")
+        FlyMobileControls.Size = UDim2.new(1, 0, 0, 200)
+        FlyMobileControls.Position = UDim2.new(0, 0, 1, -210)
+        FlyMobileControls.BackgroundTransparency = 1
+        FlyMobileControls.Parent = Gui
+
+        -- Joystick base
+        local JoyBase = Instance.new("Frame")
+        JoyBase.Size = UDim2.new(0, 140, 0, 140)
+        JoyBase.Position = UDim2.new(0, 30, 0.5, -70)
+        JoyBase.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        JoyBase.BackgroundTransparency = 0.3
+        JoyBase.BorderSizePixel = 0
+        JoyBase.Parent = FlyMobileControls
+        Fn.Corner(JoyBase, 999)
+        Fn.Border(JoyBase, C.Accent, 2)
+
+        local JoyInner = Instance.new("Frame")
+        JoyInner.Size = UDim2.new(0, 60, 0, 60)
+        JoyInner.Position = UDim2.new(0.5, -30, 0.5, -30)
+        JoyInner.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        JoyInner.BackgroundTransparency = 0.2
+        JoyInner.BorderSizePixel = 0
+        JoyInner.ZIndex = 2
+        JoyInner.Parent = JoyBase
+        Fn.Corner(JoyInner, 999)
+
+        -- Up button
+        local UpBtn = Instance.new("TextButton")
+        UpBtn.Size = UDim2.new(0, 80, 0, 75)
+        UpBtn.Position = UDim2.new(1, -110, 0, 0)
+        UpBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 100)
+        UpBtn.BackgroundTransparency = 0.3
+        UpBtn.Text = "⬆️"
+        UpBtn.TextSize = 32
+        UpBtn.Font = Enum.Font.GothamBold
+        UpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        UpBtn.BorderSizePixel = 0
+        UpBtn.Parent = FlyMobileControls
+        Fn.Corner(UpBtn, 15)
+
+        -- Down button
+        local DwnBtn = Instance.new("TextButton")
+        DwnBtn.Size = UDim2.new(0, 80, 0, 75)
+        DwnBtn.Position = UDim2.new(1, -110, 0, 95)
+        DwnBtn.BackgroundColor3 = Color3.fromRGB(180, 80, 80)
+        DwnBtn.BackgroundTransparency = 0.3
+        DwnBtn.Text = "⬇️"
+        DwnBtn.TextSize = 32
+        DwnBtn.Font = Enum.Font.GothamBold
+        DwnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        DwnBtn.BorderSizePixel = 0
+        DwnBtn.Parent = FlyMobileControls
+        Fn.Corner(DwnBtn, 15)
+
+        -- Joystick logic
+        local joystickActive = false
+        local maxRadius = 40
+
+        local function updateJoy(pos)
+            local center = JoyBase.AbsolutePosition + JoyBase.AbsoluteSize / 2
+            local offset = Vector2.new(pos.X - center.X, pos.Y - center.Y)
+            local dist = math.min(offset.Magnitude, maxRadius)
+            local dir = offset.Magnitude > 0 and offset.Unit or Vector2.new(0, 0)
+            local clamped = dir * dist
+            JoyInner.Position = UDim2.new(0.5, clamped.X - 30, 0.5, clamped.Y - 30)
+            mobileJoystickInput = Vector2.new(clamped.X / maxRadius, clamped.Y / maxRadius)
+        end
+
+        local function resetJoy()
+            joystickActive = false
+            mobileJoystickInput = Vector2.new(0, 0)
+            _TweenService:Create(JoyInner, TweenInfo.new(0.2, Enum.EasingStyle.Back), {
+                Position = UDim2.new(0.5, -30, 0.5, -30)
+            }):Play()
+        end
+
+        JoyBase.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then
+                joystickActive = true
+                updateJoy(i.Position)
+            end
+        end)
+        JoyBase.InputChanged:Connect(function(i)
+            if joystickActive and i.UserInputType == Enum.UserInputType.Touch then
+                updateJoy(i.Position)
+            end
+        end)
+        JoyBase.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then resetJoy() end
+        end)
+        _UserInputService.TouchMoved:Connect(function(t)
+            if joystickActive then updateJoy(t.Position) end
+        end)
+        _UserInputService.TouchEnded:Connect(function()
+            if joystickActive then resetJoy() end
+        end)
+
+        -- Up/Down buttons
+        UpBtn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then mobileUpPressed = true end
+        end)
+        UpBtn.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then mobileUpPressed = false end
+        end)
+        DwnBtn.InputBegan:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then mobileDownPressed = true end
+        end)
+        DwnBtn.InputEnded:Connect(function(i)
+            if i.UserInputType == Enum.UserInputType.Touch then mobileDownPressed = false end
+        end)
+    end
+
     if FlyState.connection then FlyState.connection:Disconnect() end
-    FlyState.connection = RunService.RenderStepped:Connect(function()
+    FlyState.connection = _RunService.Heartbeat:Connect(function()
         if not FlyState.enabled then return end
-        local char2 = LP.Character
+        local char2 = LP2.Character
         if not char2 then return end
         local hrp2 = char2:FindFirstChild("HumanoidRootPart")
         if not hrp2 then return end
@@ -141,53 +270,41 @@ function Fn.EnableFly()
         local cam = workspace.CurrentCamera
         local moveDir = Vector3.zero
 
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            moveDir = moveDir + cam.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            moveDir = moveDir - cam.CFrame.LookVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            moveDir = moveDir - cam.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            moveDir = moveDir + cam.CFrame.RightVector
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            moveDir = moveDir + Vector3.new(0, 1, 0)
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then
-            moveDir = moveDir - Vector3.new(0, 1, 0)
+        if State.IsMobile then
+            local forward = cam.CFrame.LookVector * -mobileJoystickInput.Y
+            local right = cam.CFrame.RightVector * mobileJoystickInput.X
+            local vert = Vector3.new(0, (mobileUpPressed and 1 or 0) - (mobileDownPressed and 1 or 0), 0)
+            moveDir = forward + right + vert
+        else
+            if _UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + cam.CFrame.LookVector end
+            if _UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - cam.CFrame.LookVector end
+            if _UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - cam.CFrame.RightVector end
+            if _UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + cam.CFrame.RightVector end
+            if _UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
+            if _UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
         end
 
         if moveDir.Magnitude > 0 then
-            moveDir = moveDir.Unit
+            bv.Velocity = moveDir.Unit * FlyState.speed
+        else
+            bv.Velocity = Vector3.zero
         end
 
-        if FlyState.bodyVel and FlyState.bodyVel.Parent then
-            FlyState.bodyVel.Velocity = moveDir * FlyState.speed
-        end
-        if FlyState.bodyGyro and FlyState.bodyGyro.Parent then
-            FlyState.bodyGyro.CFrame = cam.CFrame
-        end
+        bg.CFrame = cam.CFrame
     end)
 end
 
 function Fn.DisableFly()
+    local LP = game:GetService("Players").LocalPlayer
     FlyState.enabled = false
+    mobileUpPressed = false
+    mobileDownPressed = false
+    mobileJoystickInput = Vector2.new(0, 0)
 
-    if FlyState.connection then
-        FlyState.connection:Disconnect()
-        FlyState.connection = nil
-    end
-    if FlyState.bodyVel and FlyState.bodyVel.Parent then
-        FlyState.bodyVel:Destroy()
-        FlyState.bodyVel = nil
-    end
-    if FlyState.bodyGyro and FlyState.bodyGyro.Parent then
-        FlyState.bodyGyro:Destroy()
-        FlyState.bodyGyro = nil
-    end
+    if FlyState.connection then FlyState.connection:Disconnect() FlyState.connection = nil end
+    if FlyState.bodyVel and FlyState.bodyVel.Parent then FlyState.bodyVel:Destroy() FlyState.bodyVel = nil end
+    if FlyState.bodyGyro and FlyState.bodyGyro.Parent then FlyState.bodyGyro:Destroy() FlyState.bodyGyro = nil end
+    if FlyMobileControls then FlyMobileControls:Destroy() FlyMobileControls = nil end
 
     local char = LP.Character
     if char then
@@ -195,11 +312,6 @@ function Fn.DisableFly()
         if hum then hum.PlatformStand = false end
     end
 end
-
-
-
-
-
 local GodState = {
     enabled         = false,
     DEPTH           = -5,
@@ -1806,7 +1918,7 @@ end
 -- // SCREEN GUI
 -- ════════════════════════════════════════
 local Gui = Instance.new("ScreenGui")
-Gui.Name = "MuslimDevs"
+Gui.Name = "Muslim | Devs"
 Gui.ResetOnSpawn = false
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Gui.Parent = LP.PlayerGui
@@ -1859,8 +1971,28 @@ do
     Main.BorderSizePixel = 0
     Main.ClipsDescendants = true
     Main.Parent = Gui
-    Fn.Corner(Main, 12)
-    Fn.AccentBorder(Main, C.Border, C.Accent)
+    local auraGui = Instance.new("Frame")
+auraGui.Name = "RedAura"
+auraGui.Size = UDim2.new(1, 14, 1, 14)
+auraGui.Position = UDim2.new(0, -7, 0, -7)
+auraGui.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+auraGui.BackgroundTransparency = 0.72
+auraGui.BorderSizePixel = 0
+auraGui.ZIndex = -1
+auraGui.Parent = Main
+Fn.Corner(auraGui, 14)
+
+task.spawn(function()
+    local t = 0
+    while auraGui and auraGui.Parent do
+        t = t + 0.025
+        local pulse = (math.sin(t) + 1) / 2
+        auraGui.BackgroundTransparency = 0.68 + pulse * 0.2
+        task.wait(0.04)
+    end
+end)
+    
+
     UI.Main = Main
 end
 
@@ -1889,7 +2021,7 @@ do
     sep.ZIndex = 10
     sep.Parent = Header
 
-    local LS = State.IsMobile and 42 or 48
+    local LS = State.IsMobile and 24 or 26
 
     local logoGlow = Instance.new("Frame")
     logoGlow.Size = UDim2.new(0,LS+20,0,LS+20)
@@ -2172,13 +2304,12 @@ local TabDefs = {
     {Name="Auto",  Icon="🔄",  Color=C.Cyan,        Desc="Auto Farm"},
     {Name="Grab",  Icon="🫳",  Color=C.Pink,        Desc="Instant Grab"},
     {Name="Walls", Icon="🧱",  Color=C.Orange,      Desc="Wall Clear"},
-    {Name = "TP", Icon = "🎯", Color = Color3.fromRGB(100,60,200), Desc = "Brainrot TP" },
     {Name="God",   Icon="👑",  Color=C.GodGold,     Desc="God Mode"},
     {Name="FPS",   Icon="📊",  Color=C.GreenSoft,   Desc="FPS Boost"},
     {Name="Info",  Icon="ℹ",   Color=C.TextSub,     Desc="About"},
 }
 
-local NavW = State.IsMobile and 110 or 96
+local NavW = State.IsMobile and 90 or 80
 local contentY = State.HeaderHeight
 
 do
@@ -2703,1812 +2834,6 @@ end
 
 
 
--- ════════════════════════════════════════
--- // ═══ TAB: TP (Brainrot Tween Farmer) ═══
--- ════════════════════════════════════════
-do
-local P = UI.Pages["TP"]
-
--- ============================================================
--- SERVICES & PLAYER REFS
--- ============================================================
-local Players          = game:GetService("Players")
-local RunService       = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local ProximityPromptService = game:GetService("ProximityPromptService")
-
-local player    = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid  = character:FindFirstChildOfClass("Humanoid") or character:WaitForChild("Humanoid", 5)
-local rootPart  = character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart", 5)
-
--- ============================================================
--- CONFIG
--- ============================================================
-local CFG = {
-    BRAINROT_PATH            = workspace:FindFirstChild("ActiveBrainrots")  or workspace,
-    LUCKYBLOCK_PATH          = workspace:FindFirstChild("ActiveLuckyBlocks") or workspace,
-    TSUNAMI_PATH             = workspace:FindFirstChild("ActiveTsunamis")    or workspace,
-    TWEEN_SPEED              = 200,   -- studs/sec horizontal travel
-    TRAVEL_DEPTH             = 2,   -- how far underground to dive
-    GRAB_HEIGHT              = 5,     -- rise above target to trigger grab
-    RISE_SPEED               = 150,   -- studs/sec rising
-    DIVE_SPEED               = 200,   -- studs/sec diving
-    WAIT_AT_TARGET           = 0.15,  -- seconds at grab point before moving on
-    AUTO_LOOP                = true,
-    PROMPT_OVERRIDE_DISTANCE = 9999,
-    WAVE_SAFE_DISTANCE       = 120,
-    WAVE_CHECK_INTERVAL      = 0.3,
-    WAVE_MAX_WAIT            = 30,
-    TOWER_CFRAME             = CFrame.new(4317.72754, 0.160423279, -1.95649445),
-    TRIAL_TIME_LIMIT         = 260,
-    TRIAL_COOLDOWN_WAIT      = 5,
-    ANTI_RUBBERBAND          = true,
-    CLOSEST_FIRST            = true,
-    MID_TWEEN_WAVE_CHECK     = true,
-    WAVE_CHECK_FRAMES        = 10,
-}
-
--- ============================================================
--- STATE
--- ============================================================
-local ST = {
-    running = false, returning = false, stopping = false,
-    activeSubTab = "Brainrot", farmingTab = "Brainrot",
-    brainrotSelectedRarities = {}, luckyBlockSelectedRarities = {},
-    brainrotCheckboxes = {}, luckyBlockCheckboxes = {},
-    totalGrabbed = 0,
-    autoTrialEnabled = false, autoTrialRunning = false,
-    trialInProgress = false, trialGrabbed = 0, trialRequired = 0,
-    trialCollecting = false,
-    currentTrialRarity = nil, currentTrialFolder = nil,
-    previousTrialRarity = nil, rarityChangeCount = 0,
-    lastScanResult = nil, lastScanFolder = nil,
-    continuousTrackerRunning = false, trackerScanCount = 0,
-    savedTrialSelections = {}, savedTrialTab = nil, trialAutoSelected = false,
-    floorOriginalData = {}, floorsCleared = false, floorClearEnabled = true,
-    currentMapName = "None", mapWatcherConnection = nil,
-    savedCFrame = nil,
-    bodyVel = nil, bodyGyro = nil,
-    physicsLocked = false, frameConn = nil,
-    savedWalkSpeed = 16, savedJumpPower = 50,
-    tweening = false,
-    noclipEnabled = false, noclipConnection = nil,
-    autoInstantEnabled = false, promptConnections = {},
-    waveCheckEnabled = true,
-    respawning = false,
-    tweenFrameCount = 0, tweenStartTime = 0,
-    waveEmergencyDive = false,
-}
-
--- UI label refs
-local LBL = {}
-
--- ============================================================
--- ALIVE / CHAR
--- ============================================================
-local function isAlive()
-    if ST.respawning then return false end
-    if not character or not character.Parent then return false end
-    if not humanoid or not humanoid.Parent then return false end
-    if not rootPart  or not rootPart.Parent  then return false end
-    if humanoid.Health <= 0 then return false end
-    return true
-end
-
-local function refreshChar()
-    local waited = 0
-    while ST.respawning and waited < 8 do task.wait(0.2); waited += 0.2 end
-    local max = 0
-    while max < 10 do
-        local ch = player.Character
-        if ch and ch.Parent then
-            local hum  = ch:FindFirstChildOfClass("Humanoid")
-            local root = ch:FindFirstChild("HumanoidRootPart")
-            if hum and root and hum.Health > 0 then
-                character = ch; humanoid = hum; rootPart = root; break end
-        end
-        task.wait(0.3); max += 0.3
-    end
-end
-
--- ============================================================
--- FLOOR CLEAR
--- ============================================================
-local function findFloorsFolder()
-    for _, c in pairs(workspace:GetChildren()) do
-        if string.find(c.Name,"SharedInstances") or string.find(c.Name,"_Shared") then
-            local f = c:FindFirstChild("Floors")
-            if f then return f, c.Name end
-            for _, d in pairs(c:GetDescendants()) do if d.Name=="Floors" then return d, c.Name end end
-        end
-    end
-    for _, c in pairs(workspace:GetChildren()) do
-        if c.Name=="Floors" then return c,"workspace" end
-        local f = c:FindFirstChild("Floors"); if f then return f, c.Name end
-    end
-    return nil, "None"
-end
-
-local function clearFloors()
-    if not ST.floorClearEnabled or ST.floorsCleared then return end
-    local f, m = findFloorsFolder(); if not f then ST.currentMapName="No floors"; return end
-    ST.currentMapName = m; ST.floorsCleared = true; ST.floorOriginalData = {}
-    for _, p in pairs(f:GetDescendants()) do
-        if p:IsA("BasePart") then
-            table.insert(ST.floorOriginalData,{Part=p,Transparency=p.Transparency,CanCollide=p.CanCollide})
-            p.Transparency=1; p.CanCollide=false
-        end
-    end
-end
-
-local function restoreFloors()
-    if not ST.floorsCleared then return end
-    for _, d in pairs(ST.floorOriginalData) do
-        if d.Part and d.Part.Parent then d.Part.Transparency=d.Transparency; d.Part.CanCollide=d.CanCollide end
-    end
-    ST.floorOriginalData={}; ST.floorsCleared=false
-end
-
-local function updateFloorLabel()
-    if not LBL.Floor then return end
-    if ST.floorsCleared then
-        LBL.Floor.Text = "Floors: CLEARED ["..#ST.floorOriginalData.." parts]"
-        LBL.Floor.TextColor3 = Color3.fromRGB(255,100,100)
-    else
-        local f = findFloorsFolder()
-        if f then LBL.Floor.Text = "Floors: Ready"; LBL.Floor.TextColor3 = Color3.fromRGB(100,255,100)
-        else LBL.Floor.Text = "Floors: No map"; LBL.Floor.TextColor3 = Color3.fromRGB(255,180,80) end
-    end
-end
-
-local function checkMapChange()
-    if ST.floorClearEnabled and ST.floorsCleared then
-        local _, m = findFloorsFolder()
-        if m ~= ST.currentMapName then restoreFloors(); task.wait(0.3); clearFloors(); updateFloorLabel() end
-    end
-end
-
-local function startMapWatcher()
-    if ST.mapWatcherConnection then return end
-    ST.mapWatcherConnection = workspace.ChildAdded:Connect(function(child)
-        if string.find(child.Name,"SharedInstances") or string.find(child.Name,"_Shared") then
-            task.wait(2)
-            local floors = child:FindFirstChild("Floors")
-            if not floors then for _,d in pairs(child:GetDescendants()) do if d.Name=="Floors" then floors=d; break end end end
-            if floors then
-                if ST.floorsCleared then restoreFloors() end
-                ST.currentMapName = child.Name
-                if ST.running or ST.autoTrialRunning then task.wait(0.5); clearFloors() end
-                updateFloorLabel()
-            end
-        end
-    end)
-end
-
--- ============================================================
--- RARITY / SCANNER
--- ============================================================
-local RARITY_KW = {"cosmic","celestial","divine","secret","mythical","mythic","legendary","epic","rare","uncommon","common"}
-
-local function extractRarity(text)
-    if not text or #text==0 then return nil,nil end
-    local lo = string.lower(text)
-    if lo:match("time remaining") or lo:match("cooldown") or lo:match("seconds left") then return nil,nil end
-    if lo:match("^%s*%d+%s*$") or lo:match("^%s*%d+:%d") then return nil,nil end
-    for _, kw in ipairs(RARITY_KW) do
-        if lo:find(kw,1,true) then
-            local c = tonumber(lo:match("(%d+)%s*x?%s*"..kw)) or
-                      tonumber(lo:match(kw.."%s*[x:%-]?%s*(%d+)")) or
-                      tonumber(lo:match("[%(%[](%d+)[%)%]]")) or
-                      tonumber(lo:match("x(%d+)"))
-            if not c then for n in lo:gmatch("(%d+)") do local v=tonumber(n); if v and v>=1 and v<=99 then c=v; break end end end
-            return kw, c or 1
-        end
-    end
-    return nil,nil
-end
-
-local function getInfoFrame()
-    local ok,i = pcall(function() return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Billboard.BillboardGui.Frame.Info end)
-    return ok and i or nil
-end
-
-local function readInfoDirect()
-    local info = getInfoFrame(); if not info or not info.Parent then return nil,nil,nil end
-    local best, bestPri = nil, 999
-    for _, d in pairs(info:GetDescendants()) do
-        if (d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox")) then
-            local text = d.Text; if not text or #text<2 then continue end
-            local lo = string.lower(text)
-            local inTimer = false; local par = d.Parent
-            while par and par ~= info do
-                local pn = string.lower(par.Name)
-                if pn:find("timer") or pn:find("cooldown") or pn:find("countdown") then inTimer=true; break end
-                par = par.Parent
-            end
-            if inTimer then continue end
-            if lo:match("^%s*%d+%s*$") or lo:match("^%s*%d+:%d") or lo:match("^%s*%d+s%s*$") then continue end
-            if lo:find("time remaining",1,true) or lo:find("cooldown",1,true) then continue end
-            local r,c = extractRarity(text)
-            if r then
-                local pri = 50
-                if lo:find("bring",1,true) then pri=1 elseif lo:find("collect",1,true) then pri=2
-                elseif lo:find("deliver",1,true) then pri=3 elseif lo:find("need",1,true) then pri=4
-                elseif lo:find("brainrot",1,true) then pri=8 end
-                if pri < bestPri then bestPri=pri; best={r=r,c=c,t=text} end
-            end
-        end
-    end
-    if best then return best.r, best.c, best.t end
-    return nil,nil,nil
-end
-
-local function scanTrialBillboard()
-    local r,c,t = readInfoDirect(); if r then return r,c,t end
-    local pg = player:FindFirstChild("PlayerGui"); if not pg then return nil,nil,nil end
-    local bm, bp = nil, 999
-    for _, d in pairs(pg:GetDescendants()) do
-        if (d:IsA("TextLabel") or d:IsA("TextButton")) and d.Visible then
-            local text=d.Text; if not text or #text<2 then continue end
-            local lo=string.lower(text)
-            local isTR = lo:find("trial") or lo:find("bring") or lo:find("collect") or lo:find("tsunami") or lo:find("deliver") or (lo:find("need") and lo:find("brainrot"))
-            if not isTR then local p=d.Parent; while p and p~=pg do local pn=string.lower(p.Name)
-                if pn:find("trial") or pn:find("tsunami") or pn:find("tower") or pn:find("quest") then isTR=true; break end; p=p.Parent end end
-            if isTR then local rv,cv=extractRarity(text)
-                if rv then local pri=50
-                    if lo:find("bring",1,true) then pri=1 elseif lo:find("collect",1,true) then pri=2
-                    elseif lo:find("deliver",1,true) then pri=3 elseif lo:find("need",1,true) then pri=4 end
-                    if pri<bp then bp=pri; bm={r=rv,c=cv} end end end
-        end
-    end
-    if bm then return bm.r, bm.c, nil end
-    return nil,nil,nil
-end
-
-local function scanWithRetry(ma,db)
-    ma=ma or 6; db=db or 0.3
-    local res = {}
-    for i=1,ma do
-        if not ST.autoTrialEnabled then return nil,nil,nil end
-        local r,c = scanTrialBillboard()
-        if r then res[r]=(res[r] or 0)+1; if res[r]>=2 then return r,c end end
-        if i<ma then task.wait(db) end
-    end
-    for i=1,4 do local r,c=scanTrialBillboard(); if r then return r,c end; task.wait(0.2) end
-    return nil,nil
-end
-
-local function getTrialContainer(name)
-    local ok,obj = pcall(function() return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Billboard.BillboardGui.Frame.Info[name] end)
-    if ok and obj and obj.Parent then return obj end
-    local info = getInfoFrame(); return info and info:FindFirstChild(name) or nil
-end
-
-local function isTrialOnCooldown()
-    local cd = getTrialContainer("CooldownContainer"); if not cd then return false end
-    local vis=true; pcall(function() vis=cd.Visible end); if not vis then return false end
-    local t=""; for _,d in pairs(cd:GetDescendants()) do if d:IsA("TextLabel") and d.Visible and d.Text and #d.Text>0 then t=t.." "..d.Text end end
-    return #t>0
-end
-
-local function isTrialTimerActive()
-    local tm = getTrialContainer("TrialTimerContainer"); if not tm then return false end
-    local vis=true; pcall(function() vis=tm.Visible end); if not vis then return false end
-    local t=""; for _,d in pairs(tm:GetDescendants()) do if d:IsA("TextLabel") and d.Visible and d.Text and #d.Text>0 then t=t.." "..d.Text end end
-    return #t>0 and t:find("%d") ~= nil
-end
-
-local function getProximityPrompt()
-    -- Correct path: workspace.GameObjects.PlaceSpecific.root.Tower.Main.Prompt.ProximityPrompt
-    local ok,obj = pcall(function()
-        return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Prompt.ProximityPrompt
-    end)
-    if ok and obj and obj.Parent and obj:IsA("ProximityPrompt") then return obj end
-    -- Fallback: check the Prompt part itself and all its children
-    local ok2,part = pcall(function() return workspace.GameObjects.PlaceSpecific.root.Tower.Main.Prompt end)
-    if ok2 and part and part.Parent then
-        if part:IsA("ProximityPrompt") then return part end
-        for _,c in pairs(part:GetDescendants()) do if c:IsA("ProximityPrompt") then return c end end
-    end
-    return nil
-end
-
-local function matchRarityFolder(kw)
-    if not kw then return nil end; local lo=string.lower(kw)
-    for _,c in pairs(CFG.BRAINROT_PATH:GetChildren()) do
-        if (c:IsA("Folder") or c:IsA("Model")) and string.lower(c.Name)==lo then return c.Name end end
-    for _,c in pairs(CFG.BRAINROT_PATH:GetChildren()) do
-        if (c:IsA("Folder") or c:IsA("Model")) then local cn=string.lower(c.Name)
-            if cn:find(lo,1,true) or lo:find(cn,1,true) then return c.Name end end end
-    return nil
-end
-
--- ============================================================
--- TRIAL TRACKER
--- ============================================================
-local function resetTracker()
-    ST.previousTrialRarity=nil; ST.currentTrialRarity=nil; ST.currentTrialFolder=nil
-    ST.lastScanResult=nil; ST.lastScanFolder=nil; ST.rarityChangeCount=0; ST.trackerScanCount=0
-end
-
-local function updateTrackerLabel()
-    if not LBL.Tracker then return end
-    if ST.currentTrialFolder then
-        LBL.Tracker.Text = "★ "..ST.currentTrialFolder.." ★ (scans:"..ST.trackerScanCount..")"
-        LBL.Tracker.TextColor3 = Color3.fromRGB(0,255,200)
-    else LBL.Tracker.Text = "Tracker: Waiting..."; LBL.Tracker.TextColor3 = Color3.fromRGB(255,150,255) end
-end
-
-local function autoSelectTrialRarity(fn)
-    for n,d in pairs(ST.brainrotCheckboxes) do
-        ST.brainrotSelectedRarities[n]=nil; d.Check.Text=""; d.Check.BackgroundColor3=Color3.fromRGB(50,50,70) end
-    if ST.brainrotCheckboxes[fn] then
-        ST.brainrotSelectedRarities[fn]=true; ST.brainrotCheckboxes[fn].Check.Text="★"
-        ST.brainrotCheckboxes[fn].Check.BackgroundColor3=Color3.fromRGB(0,160,255)
-        return true end
-    return false
-end
-
-local function saveSelections()
-    ST.savedTrialSelections={}
-    for n,v in pairs(ST.brainrotSelectedRarities) do ST.savedTrialSelections[n]=v end
-    ST.trialAutoSelected=true
-end
-
-local function restoreSelections()
-    if not ST.trialAutoSelected then return end
-    for n,d in pairs(ST.brainrotCheckboxes) do
-        ST.brainrotSelectedRarities[n]=nil; d.Check.Text=""; d.Check.BackgroundColor3=Color3.fromRGB(50,50,70) end
-    for n,v in pairs(ST.savedTrialSelections) do
-        if v and ST.brainrotCheckboxes[n] then
-            ST.brainrotSelectedRarities[n]=true; ST.brainrotCheckboxes[n].Check.Text="Y"
-            ST.brainrotCheckboxes[n].Check.BackgroundColor3=Color3.fromRGB(40,100,40) end end
-    ST.savedTrialSelections={}; ST.trialAutoSelected=false
-end
-
-local function startContinuousTracker()
-    if ST.continuousTrackerRunning then return end; ST.continuousTrackerRunning=true; ST.trackerScanCount=0
-    task.spawn(function()
-        while ST.autoTrialEnabled and ST.continuousTrackerRunning do
-            if ST.trialInProgress and ST.trialCollecting then
-                ST.trackerScanCount+=1
-                local nr,nc = readInfoDirect()
-                if nr then local nf=matchRarityFolder(nr)
-                    if nf then
-                        if ST.currentTrialRarity and nr~=ST.currentTrialRarity then
-                            ST.previousTrialRarity=ST.currentTrialRarity; ST.currentTrialRarity=nr
-                            ST.currentTrialFolder=nf; ST.rarityChangeCount+=1; ST.trialRequired=nc or 1
-                            autoSelectTrialRarity(nf)
-                            if LBL.TrialStatus then LBL.TrialStatus.Text="Changed! Need "..tostring(nc or 1).." "..nf; LBL.TrialStatus.TextColor3=Color3.fromRGB(255,200,0) end
-                        else ST.currentTrialRarity=nr; ST.currentTrialFolder=nf; ST.trialRequired=nc or ST.trialRequired end
-                        ST.lastScanResult=nr; ST.lastScanFolder=nf end end
-                updateTrackerLabel()
-            end
-            checkMapChange(); task.wait(0.5)
-        end
-        ST.continuousTrackerRunning=false
-    end)
-end
-
-local function stopContinuousTracker() ST.continuousTrackerRunning=false end
-
--- ============================================================
--- WAVE / TSUNAMI
--- ============================================================
-local function getTsunamiDist(pos)
-    if not CFG.TSUNAMI_PATH or not CFG.TSUNAMI_PATH.Parent then return math.huge end
-    local cl=math.huge
-    for _,o in pairs(CFG.TSUNAMI_PATH:GetDescendants()) do
-        if o:IsA("BasePart") then local d=(o.Position-pos).Magnitude; if d<cl then cl=d end end end
-    return cl
-end
-
-local function isWaveNear(pos,sd) return getTsunamiDist(pos)<(sd or CFG.WAVE_SAFE_DISTANCE) end
-
-local function waitWaveClear(tp,cb)
-    local st=tick()
-    while true do
-        if getTsunamiDist(tp)<CFG.WAVE_SAFE_DISTANCE then
-            if cb then cb("Wave nearby...") end
-            task.wait(CFG.WAVE_CHECK_INTERVAL)
-            if tick()-st>CFG.WAVE_MAX_WAIT then return true end
-            if not ST.running and not ST.autoTrialRunning then return false end
-        else return true end
-    end
-end
-
-local function updateWaveLabel()
-    if not LBL.Wave then return end
-    local pos = rootPart and rootPart.Parent and rootPart.Position or Vector3.zero
-    local d = getTsunamiDist(pos)
-    if d<CFG.WAVE_SAFE_DISTANCE then LBL.Wave.Text="⚠ WAVE! ("..math.floor(d)..")"; LBL.Wave.TextColor3=Color3.fromRGB(255,60,60)
-    elseif d<CFG.WAVE_SAFE_DISTANCE*2 then LBL.Wave.Text="Wave near ("..math.floor(d)..")"; LBL.Wave.TextColor3=Color3.fromRGB(255,200,60)
-    else LBL.Wave.Text="Waves: Safe"; LBL.Wave.TextColor3=Color3.fromRGB(100,255,100) end
-end
-
--- ============================================================
--- PHYSICS LOCK / NOCLIP
--- ============================================================
-local lockPhysics, unlockPhysics
-
-lockPhysics = function()
-    if ST.physicsLocked then return end
-    if not rootPart or not rootPart.Parent then return end
-    ST.physicsLocked=true
-    ST.savedWalkSpeed=humanoid.WalkSpeed; ST.savedJumpPower=humanoid.JumpPower
-    humanoid.WalkSpeed=0; humanoid.JumpPower=0; pcall(function() humanoid.JumpHeight=0 end)
-    for _,s in ipairs({Enum.HumanoidStateType.Swimming,Enum.HumanoidStateType.Freefall,Enum.HumanoidStateType.FallingDown,Enum.HumanoidStateType.Ragdoll,Enum.HumanoidStateType.GettingUp,Enum.HumanoidStateType.Jumping,Enum.HumanoidStateType.Landed,Enum.HumanoidStateType.Climbing}) do
-        pcall(function() humanoid:SetStateEnabled(s,false) end) end
-    pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Physics) end)
-    for _,o in pairs(rootPart:GetChildren()) do if o.Name=="_BTP_Lock" then o:Destroy() end end
-    ST.bodyVel=Instance.new("BodyVelocity"); ST.bodyVel.Name="_BTP_Lock"; ST.bodyVel.Velocity=Vector3.zero; ST.bodyVel.MaxForce=Vector3.new(1e9,1e9,1e9); ST.bodyVel.P=1e9; ST.bodyVel.Parent=rootPart
-    ST.bodyGyro=Instance.new("BodyGyro"); ST.bodyGyro.Name="_BTP_Lock"; ST.bodyGyro.CFrame=rootPart.CFrame; ST.bodyGyro.MaxTorque=Vector3.new(1e9,1e9,1e9); ST.bodyGyro.P=1e9; ST.bodyGyro.Parent=rootPart
-    if ST.frameConn then ST.frameConn:Disconnect() end
-    ST.frameConn=RunService.Heartbeat:Connect(function()
-        if not rootPart or not rootPart.Parent or ST.tweening then return end
-        rootPart.Velocity=Vector3.zero; rootPart.AssemblyLinearVelocity=Vector3.zero; rootPart.AssemblyAngularVelocity=Vector3.zero
-        if ST.bodyGyro and ST.bodyGyro.Parent then ST.bodyGyro.CFrame=rootPart.CFrame end
-    end)
-end
-
-unlockPhysics = function()
-    ST.physicsLocked=false
-    if ST.frameConn then ST.frameConn:Disconnect(); ST.frameConn=nil end
-    if ST.bodyVel  and ST.bodyVel.Parent  then ST.bodyVel:Destroy()  end
-    if ST.bodyGyro and ST.bodyGyro.Parent then ST.bodyGyro:Destroy() end
-    ST.bodyVel=nil; ST.bodyGyro=nil
-    if rootPart and rootPart.Parent then for _,o in pairs(rootPart:GetChildren()) do if o.Name=="_BTP_Lock" then o:Destroy() end end end
-    if humanoid then
-        humanoid.WalkSpeed=ST.savedWalkSpeed; humanoid.JumpPower=ST.savedJumpPower; pcall(function() humanoid.JumpHeight=7.2 end)
-        for _,s in ipairs({Enum.HumanoidStateType.Swimming,Enum.HumanoidStateType.Freefall,Enum.HumanoidStateType.FallingDown,Enum.HumanoidStateType.Ragdoll,Enum.HumanoidStateType.GettingUp,Enum.HumanoidStateType.Jumping,Enum.HumanoidStateType.Landed,Enum.HumanoidStateType.Climbing,Enum.HumanoidStateType.Running}) do
-            pcall(function() humanoid:SetStateEnabled(s,true) end) end
-        pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Running) end)
-    end
-end
-
-local function enableNoclip()
-    if ST.noclipConnection then return end; ST.noclipEnabled=true
-    ST.noclipConnection=RunService.Stepped:Connect(function()
-        if not character or not character.Parent then return end
-        for _,p in pairs(character:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide=false end end end)
-end
-
-local function disableNoclip()
-    ST.noclipEnabled=false
-    if ST.noclipConnection then ST.noclipConnection:Disconnect(); ST.noclipConnection=nil end
-end
-
--- ============================================================
--- FORCE CFRAME / FREEZE
--- ============================================================
-local function forceCF(cf)
-    if not rootPart or not rootPart.Parent then return end
-    rootPart.CFrame = cf
-    rootPart.Velocity = Vector3.zero
-    rootPart.AssemblyLinearVelocity  = Vector3.zero
-    rootPart.AssemblyAngularVelocity = Vector3.zero
-    if CFG.ANTI_RUBBERBAND then
-        rootPart.CFrame = cf
-        rootPart.Velocity = Vector3.zero
-        rootPart.AssemblyLinearVelocity  = Vector3.zero
-        rootPart.AssemblyAngularVelocity = Vector3.zero
-    end
-end
-
-local function freeze()
-    if not rootPart or not rootPart.Parent then return end
-    rootPart.Velocity = Vector3.zero
-    rootPart.AssemblyLinearVelocity  = Vector3.zero
-    rootPart.AssemblyAngularVelocity = Vector3.zero
-    if ST.bodyVel and ST.bodyVel.Parent then
-        ST.bodyVel.Velocity  = Vector3.zero
-        ST.bodyVel.MaxForce  = Vector3.new(1e9,1e9,1e9)
-    end
-end
-
--- ============================================================
--- TWEEN ENGINE  (token-based, race-condition-free)
--- ============================================================
-ST.activeTweenToken = nil
-ST.returnTweenToken = nil
-ST.towerTweenToken  = nil
-local tweenTokenCounter = 0
-
-local function newToken()
-    tweenTokenCounter += 1
-    return tweenTokenCounter
-end
-
-local function doTween(targetCF, speed, ease, allowReturn)
-    if not rootPart or not rootPart.Parent then return false end
-    if ST.respawning or not isAlive() then return false end
-    if not allowReturn and not ST.running and not ST.autoTrialEnabled then return false end
-
-    local myToken = newToken()
-    if allowReturn then
-        ST.returnTweenToken = myToken
-    else
-        ST.activeTweenToken = myToken
-    end
-
-    local dist = (rootPart.Position - targetCF.Position).Magnitude
-    if dist < 0.5 then forceCF(targetCF); return true end
-
-    local dur = math.max(dist / speed, 0.02)
-    local startCF = rootPart.CFrame
-    local startT  = tick()
-
-    ST.tweening        = true
-    ST.tweenFrameCount = 0
-    ST.waveEmergencyDive = false
-
-    if ST.bodyVel  and ST.bodyVel.Parent  then ST.bodyVel.MaxForce  = Vector3.zero end
-    if ST.bodyGyro and ST.bodyGyro.Parent then ST.bodyGyro.MaxTorque = Vector3.zero end
-
-    local function easeF(a)
-        if ease == 1 then return 0.5 - 0.5*math.cos(a*math.pi)
-        elseif ease == 2 then return 1 - (1-a)*(1-a) end
-        return a
-    end
-
-    local running = true
-    while running do
-        if not isAlive() then ST.tweening = false; return false end
-
-        if allowReturn then
-            if ST.returnTweenToken ~= myToken then ST.tweening = false; freeze(); return false end
-        else
-            if ST.activeTweenToken ~= myToken then ST.tweening = false; freeze(); return false end
-        end
-
-        local el = tick() - startT
-        local ra = math.clamp(el / dur, 0, 1)
-        local a  = easeF(ra)
-
-        ST.tweenFrameCount += 1
-        forceCF(startCF:Lerp(targetCF, a))
-        pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Physics) end)
-
-        if LBL.Speed and ST.tweenFrameCount % 5 == 0 then
-            LBL.Speed.Text = string.format("%.0f studs | %.1fs", dist*(1-ra), math.max(0, dur-el))
-        end
-
-        if CFG.MID_TWEEN_WAVE_CHECK and ST.waveCheckEnabled and ST.tweenFrameCount % CFG.WAVE_CHECK_FRAMES == 0 then
-            if isWaveNear(rootPart.Position, CFG.WAVE_SAFE_DISTANCE * 0.6) then
-                ST.tweening = false; ST.waveEmergencyDive = true; freeze(); return false
-            end
-        end
-
-        if ra >= 1 then break end
-        RunService.Heartbeat:Wait()
-    end
-
-    ST.tweening = false
-    forceCF(targetCF)
-    freeze()
-    return true
-end
-
-local function stopTween()
-    ST.activeTweenToken = nil
-    ST.tweening = false
-end
-
-local function stopAllTweens()
-    ST.activeTweenToken = nil
-    ST.returnTweenToken = nil
-    ST.towerTweenToken  = nil
-    ST.tweening = false
-end
-
--- Return-only tween: used exclusively by stopAndReturn.
--- Has its own token, cannot be cancelled by farming or tower tweens.
-local function doTweenReturn(targetCF, speed, ease)
-    if not rootPart or not rootPart.Parent then return false end
-    if ST.respawning then return false end
-    -- only runs while ST.stopping is true
-    if not ST.stopping then return false end
-
-    local myToken = newToken()
-    ST.returnTweenToken = myToken
-
-    local dist = (rootPart.Position - targetCF.Position).Magnitude
-    if dist < 0.5 then return true end
-
-    local dur     = math.max(dist / speed, 0.02)
-    local startCF = rootPart.CFrame
-    local startT  = tick()
-
-    ST.tweening = true
-    if ST.bodyVel  and ST.bodyVel.Parent  then ST.bodyVel.MaxForce   = Vector3.zero end
-    if ST.bodyGyro and ST.bodyGyro.Parent then ST.bodyGyro.MaxTorque = Vector3.zero end
-
-    local function easeF(a)
-        if ease == 1 then return 0.5 - 0.5*math.cos(a*math.pi)
-        elseif ease == 2 then return 1 - (1-a)*(1-a) end
-        return a
-    end
-
-    while true do
-        if not rootPart or not rootPart.Parent then ST.tweening = false; return false end
-        if ST.returnTweenToken ~= myToken then ST.tweening = false; freeze(); return false end
-        if not ST.stopping then ST.tweening = false; freeze(); return false end
-
-        local el = tick() - startT
-        local ra = math.clamp(el / dur, 0, 1)
-        forceCF(startCF:Lerp(targetCF, easeF(ra)))
-        pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Physics) end)
-        if ra >= 1 then break end
-        RunService.Heartbeat:Wait()
-    end
-
-    ST.tweening = false
-    forceCF(targetCF)
-    freeze()
-    return true
-end
-
--- Tower-only tween: uses its own token, cannot be cancelled by stopTween()
--- or by the farming loop stomping activeTweenToken.
-local function doTweenTower(targetCF, speed, ease)
-    if not rootPart or not rootPart.Parent then return false end
-    if ST.respawning or not isAlive() then return false end
-    if not ST.autoTrialEnabled then return false end
-
-    local myToken = newToken()
-    ST.towerTweenToken = myToken
-
-    local dist = (rootPart.Position - targetCF.Position).Magnitude
-    if dist < 0.5 then forceCF(targetCF); return true end
-
-    local dur      = math.max(dist / speed, 0.02)
-    local startCF  = rootPart.CFrame
-    local startT   = tick()
-
-    ST.tweening = true
-    if ST.bodyVel  and ST.bodyVel.Parent  then ST.bodyVel.MaxForce   = Vector3.zero end
-    if ST.bodyGyro and ST.bodyGyro.Parent then ST.bodyGyro.MaxTorque = Vector3.zero end
-
-    local function easeF(a)
-        if ease == 1 then return 0.5 - 0.5*math.cos(a*math.pi)
-        elseif ease == 2 then return 1 - (1-a)*(1-a) end
-        return a
-    end
-
-    while true do
-        if not isAlive() then ST.tweening = false; return false end
-        if ST.towerTweenToken ~= myToken then ST.tweening = false; freeze(); return false end
-        if not ST.autoTrialEnabled then ST.tweening = false; freeze(); return false end
-
-        local el = tick() - startT
-        local ra = math.clamp(el / dur, 0, 1)
-        forceCF(startCF:Lerp(targetCF, easeF(ra)))
-        pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Physics) end)
-        if ra >= 1 then break end
-        RunService.Heartbeat:Wait()
-    end
-
-    ST.tweening = false
-    forceCF(targetCF)
-    freeze()
-    return true
-end
-
--- ============================================================
--- SMART TWEEN TRAVEL  (dive → horizontal → rise)
--- ============================================================
-local function smartTravelTo(targetPos, grabH, skipWave, isReturn)
-    if not rootPart or not rootPart.Parent then return false end
-    if not isAlive() then return false end
-    grabH = grabH or 0
-
-    if LBL.Phase then LBL.Phase.Text = "↓ Diving..." end
-    local myPos = rootPart.Position
-    if not doTween(CFrame.new(myPos.X, myPos.Y + CFG.TRAVEL_DEPTH, myPos.Z), CFG.DIVE_SPEED, 2, isReturn) then
-        return false
-    end
-    if not isAlive() then return false end
-
-    if LBL.Phase then LBL.Phase.Text = "→ Traveling..." end
-    if not doTween(CFrame.new(targetPos.X, targetPos.Y + CFG.TRAVEL_DEPTH, targetPos.Z), CFG.TWEEN_SPEED, 0, isReturn) then
-        return false
-    end
-    if not isAlive() then return false end
-
-    if not skipWave and ST.waveCheckEnabled and isWaveNear(targetPos, CFG.WAVE_SAFE_DISTANCE) then
-        waitWaveClear(targetPos, function(m) if LBL.Phase then LBL.Phase.Text = m end end)
-        if not isAlive() then return false end
-    end
-
-    if LBL.Phase then LBL.Phase.Text = "↑ Rising..." end
-    if not doTween(CFrame.new(targetPos.X, targetPos.Y + grabH, targetPos.Z), CFG.RISE_SPEED, 2, isReturn) then
-        return false
-    end
-    return true
-end
-
-local function travelToTower()
-    refreshChar(); enableNoclip(); lockPhysics()
-    if not rootPart or not rootPart.Parent or not isAlive() then return false end
-
-    local tp    = CFG.TOWER_CFRAME.Position
-    local myPos = rootPart.Position
-    local depth = CFG.TRAVEL_DEPTH  -- negative value, e.g. -30
-
-    -- Phase 1: dive underground from current pos
-    if LBL.Phase then LBL.Phase.Text = "↓ Diving to tower..." end
-    if not doTweenTower(CFrame.new(myPos.X, myPos.Y + depth, myPos.Z), CFG.DIVE_SPEED, 2) then return false end
-    if not isAlive() then return false end
-
-    -- Phase 2: travel horizontally underground straight to tower XZ
-    if LBL.Phase then LBL.Phase.Text = "→ Flying to tower..." end
-    if not doTweenTower(CFrame.new(tp.X, tp.Y + depth, tp.Z), CFG.TWEEN_SPEED, 0) then return false end
-    if not isAlive() then return false end
-
-    -- Phase 3: rise up to tower prompt level
-    if LBL.Phase then LBL.Phase.Text = "↑ Arriving at tower..." end
-    if not doTweenTower(CFrame.new(tp.X, tp.Y + 3, tp.Z), CFG.RISE_SPEED, 2) then return false end
-
-    return isAlive()
-end
-
--- ============================================================
--- PROXIMITY PROMPT TRIGGER
--- ============================================================
-local function firePrompt(prompt)
-    if not prompt or not prompt:IsA("ProximityPrompt") then return end
-    local oh  = prompt.HoldDuration
-    local od  = prompt.MaxActivationDistance
-    local oe  = prompt.Enabled
-    local ox  = prompt.Exclusivity
-
-    prompt.HoldDuration          = 0
-    prompt.MaxActivationDistance = CFG.PROMPT_OVERRIDE_DISTANCE
-    prompt.Enabled               = true
-    prompt.Exclusivity           = Enum.ProximityPromptExclusivity.AlwaysShow
-
-    pcall(function() prompt:InputHoldBegin() end)
-    pcall(function() prompt:InputHoldEnd()   end)
-    pcall(function() ProximityPromptService:TriggerPrompt(prompt) end)
-
-    task.delay(0.1, function()
-        if prompt and prompt.Parent then
-            prompt.HoldDuration          = oh
-            prompt.MaxActivationDistance = od
-            prompt.Enabled               = oe
-            prompt.Exclusivity           = ox
-        end
-    end)
-end
-
-local function fireTrialPrompt()
-    local p = getProximityPrompt(); if not p then return false end
-    firePrompt(p)
-    return true
-end
-
-local function grabAllPrompts(obj)
-    if not obj or not obj.Parent then return end
-    local fired = {}
-    local function once(p)
-        if not p or not p:IsA("ProximityPrompt") or fired[p] then return end
-        fired[p] = true
-        firePrompt(p)
-    end
-    if obj:IsA("ProximityPrompt") then once(obj) end
-    for _,d in pairs(obj:GetDescendants()) do once(d) end
-    task.wait(0.05)
-    for p in pairs(fired) do
-        pcall(function() p:InputHoldBegin() end)
-        pcall(function() p:InputHoldEnd()   end)
-    end
-end
-
-local function grabNearbyPrompts(pos, rad)
-    rad = rad or 20
-    local list = {}
-    for _,d in pairs(workspace:GetDescendants()) do
-        if d:IsA("ProximityPrompt") and d.Parent and d.Parent:IsA("BasePart") then
-            local dist = (d.Parent.Position - pos).Magnitude
-            if dist <= rad then table.insert(list, {p=d, dist=dist}) end
-        end
-    end
-    table.sort(list, function(a,b) return a.dist < b.dist end)
-    for _,e in ipairs(list) do firePrompt(e.p) end
-    task.wait(0.05)
-    for _,e in ipairs(list) do
-        if e.p and e.p.Parent then
-            pcall(function() e.p:InputHoldBegin() end)
-            pcall(function() e.p:InputHoldEnd()   end)
-        end
-    end
-end
-
-local function fullGrab(obj, part, pos)
-    if not obj or not obj.Parent or not isAlive() then return end
-
-    if part and part.Parent and rootPart and rootPart.Parent then
-        local grabCF = part.CFrame * CFrame.new(0, 1.5, 0)
-        if ST.bodyVel and ST.bodyVel.Parent then ST.bodyVel.MaxForce = Vector3.zero end
-        doTween(grabCF, CFG.RISE_SPEED * 2, 1, true)
-        if ST.bodyVel and ST.bodyVel.Parent then
-            ST.bodyVel.MaxForce  = Vector3.new(1e9,1e9,1e9)
-            ST.bodyVel.Velocity  = Vector3.zero
-        end
-    end
-
-    task.wait(0.03)
-    grabAllPrompts(obj)
-    grabNearbyPrompts(pos or (part and part.Position or Vector3.zero), 18)
-
-    pcall(function()
-        for _,d in pairs(obj:GetDescendants()) do
-            if d:IsA("ClickDetector") then
-                pcall(function() fireclickdetector(d) end)
-            end
-        end
-    end)
-
-    task.wait(0.05)
-    grabAllPrompts(obj)
-    grabNearbyPrompts(pos or (part and part.Position or Vector3.zero), 18)
-end
-
-local function enableAutoInstant()
-    ST.autoInstantEnabled = true
-    for _,d in pairs(workspace:GetDescendants()) do
-        if d:IsA("ProximityPrompt") then
-            d.HoldDuration = 0
-            d.MaxActivationDistance = math.max(d.MaxActivationDistance, 15)
-        end
-    end
-    ST.promptConnections[#ST.promptConnections+1] = workspace.DescendantAdded:Connect(function(d)
-        if ST.autoInstantEnabled and d:IsA("ProximityPrompt") then
-            task.wait()
-            d.HoldDuration = 0
-            d.MaxActivationDistance = math.max(d.MaxActivationDistance, 15)
-        end
-    end)
-end
-
-local function disableAutoInstant()
-    ST.autoInstantEnabled = false
-    for _,c in pairs(ST.promptConnections) do c:Disconnect() end
-    ST.promptConnections = {}
-end
-
--- ============================================================
--- TARGET SCANNER
--- ============================================================
-local RARITY_ORDER  = {"common","uncommon","rare","epic","legendary","mythic","mythical","secret","divine","celestial","cosmic"}
-local RARITY_COLORS = {
-    common=Color3.fromRGB(180,180,180), uncommon=Color3.fromRGB(80,200,80),
-    rare=Color3.fromRGB(60,120,255),    epic=Color3.fromRGB(180,60,255),
-    legendary=Color3.fromRGB(255,180,0),mythic=Color3.fromRGB(255,50,50),
-    mythical=Color3.fromRGB(255,80,80), secret=Color3.fromRGB(255,0,100),
-    divine=Color3.fromRGB(255,220,100), celestial=Color3.fromRGB(180,255,255), cosmic=Color3.fromRGB(120,200,255),
-}
-
-local function getRarityColor(n)
-    local lo = string.lower(n)
-    for _, kw in ipairs(RARITY_ORDER) do if lo:find(kw) then return RARITY_COLORS[kw] end end
-    return Color3.fromRGB(200,200,200)
-end
-
-local RARITY_KW_SET = {
-    "common","uncommon","rare","epic","legendary",
-    "mythic","mythical","secret","divine","celestial","cosmic"
-}
-
-local function isRarityName(name)
-    if not name then return false end
-    local lo = string.lower(name)
-    for _, kw in ipairs(RARITY_KW_SET) do
-        if lo == kw or lo:find(kw, 1, true) then return true end
-    end
-    return false
-end
-
-local function scanBrainrotFolders()
-    local f = {}
-    for _,c in pairs(CFG.BRAINROT_PATH:GetChildren()) do
-        if (c:IsA("Folder") or c:IsA("Model")) and isRarityName(c.Name) then
-            table.insert(f, c.Name)
-        end
-    end
-    table.sort(f); return f
-end
-
-local function getBrainrots(sel)
-    local b = {}
-    for _,rn in pairs(sel) do
-        local fo = CFG.BRAINROT_PATH:FindFirstChild(rn)
-        if fo then
-            for _,br in pairs(fo:GetChildren()) do
-                local p = br:IsA("Model") and (br.PrimaryPart or br:FindFirstChildWhichIsA("BasePart"))
-                       or (br:IsA("BasePart") and br or nil)
-                if p then table.insert(b, {Name=br.Name, Rarity=rn, Part=p, Object=br}) end
-            end
-        end
-    end
-    return b
-end
-
--- ── Lucky Block rarity: brute-force scan everything on the object ──
-local function extractRarityFromString(s)
-    if not s or #s == 0 then return nil end
-    local lo = string.lower(s)
-    for _,kw in ipairs(RARITY_ORDER) do
-        if lo:find(kw, 1, true) then
-            return kw:sub(1,1):upper()..kw:sub(2)
-        end
-    end
-    return nil
-end
-
-local function extractLBRarity(obj)
-    if type(obj) == "string" then return extractRarityFromString(obj) end
-    if not obj then return nil end
-    local r
-
-    local function tryStr(s) return s and extractRarityFromString(tostring(s)) or nil end
-
-    -- 1. Object name
-    r = tryStr(obj.Name); if r then return r end
-
-    -- 2. All attributes on the object
-    local ok, attrs = pcall(function() return obj:GetAttributes() end)
-    if ok and attrs then
-        for k,v in pairs(attrs) do
-            r = tryStr(v); if r then return r end
-            r = tryStr(k); if r then return r end
-        end
-    end
-
-    -- 3. Every single descendant
-    for _,d in pairs(obj:GetDescendants()) do
-        r = tryStr(d.Name); if r then return r end
-        if d:IsA("StringValue") or d:IsA("IntValue") then
-            local ok2,val = pcall(function() return d.Value end)
-            if ok2 then r = tryStr(val); if r then return r end end
-        end
-        if d:IsA("TextLabel") or d:IsA("TextButton") then
-            local ok2,txt = pcall(function() return d.Text end)
-            if ok2 then r = tryStr(txt); if r then return r end end
-        end
-        local dok, dattrs = pcall(function() return d:GetAttributes() end)
-        if dok and dattrs then
-            for k,v in pairs(dattrs) do
-                r = tryStr(v); if r then return r end
-                r = tryStr(k); if r then return r end
-            end
-        end
-    end
-
-    return nil
-end
-
-local function getLuckyBlocksDeep(selR)
-    local b = {}
-    local function scanObj(obj)
-        local r = extractLBRarity(obj)
-        if r and selR[r] then
-            local p = obj:IsA("Model") and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart"))
-                   or (obj:IsA("BasePart") and obj or nil)
-            if p then table.insert(b, {Name=obj.Name, Rarity=r, Part=p, Object=obj}); return end
-        end
-        for _,c in pairs(obj:GetChildren()) do
-            if c:IsA("Folder") or c:IsA("Model") then scanObj(c) end
-        end
-    end
-    for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetChildren()) do
-        scanObj(c)
-    end
-    return b
-end
-
-local function getTargetsSorted()
-    local targets
-    if ST.activeSubTab == "Brainrot" then
-        local sel = {}
-        for n in pairs(ST.brainrotSelectedRarities) do table.insert(sel, n) end
-        targets = #sel > 0 and getBrainrots(sel) or {}
-    else
-        targets = getLuckyBlocksDeep(ST.luckyBlockSelectedRarities)
-    end
-    if CFG.CLOSEST_FIRST and rootPart and rootPart.Parent then
-        local pos = rootPart.Position
-        table.sort(targets, function(a,b)
-            local da = a.Part and a.Part.Parent and (a.Part.Position-pos).Magnitude or math.huge
-            local db = b.Part and b.Part.Parent and (b.Part.Position-pos).Magnitude or math.huge
-            return da < db
-        end)
-    end
-    return targets
-end
-
-local function hasSelections()
-    if ST.activeSubTab == "Brainrot" then
-        for _ in pairs(ST.brainrotSelectedRarities) do return true end
-    else
-        for _ in pairs(ST.luckyBlockSelectedRarities) do return true end
-    end
-    return false
-end
-
--- ============================================================
--- BUILD GUI
--- ============================================================
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(1,0,1,0)
-scrollFrame.BackgroundTransparency = 1
-scrollFrame.BorderSizePixel = 0
-scrollFrame.ScrollBarThickness = 4
-scrollFrame.ScrollBarImageColor3 = Color3.fromRGB(100,60,200)
-scrollFrame.CanvasSize = UDim2.new(0,0,0,0)
-scrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y
-scrollFrame.Parent = P
-
-local list = Instance.new("UIListLayout", scrollFrame)
-list.Padding = UDim.new(0,4)
-list.SortOrder = Enum.SortOrder.LayoutOrder
-list.FillDirection = Enum.FillDirection.Vertical
-
-local pad = Instance.new("UIPadding", scrollFrame)
-pad.PaddingTop = UDim.new(0,6); pad.PaddingLeft = UDim.new(0,6); pad.PaddingRight = UDim.new(0,6)
-
-local layoutOrder = 0
-local function nextOrder() layoutOrder+=1; return layoutOrder end
-
-local function mkLabel(text, textColor, h, fs)
-    local f = Instance.new("Frame"); f.Size=UDim2.new(1,-12,0,h or 18); f.BackgroundTransparency=1; f.LayoutOrder=nextOrder(); f.Parent=scrollFrame
-    local l = Instance.new("TextLabel",f); l.Size=UDim2.new(1,0,1,0); l.BackgroundTransparency=1; l.Text=text; l.TextColor3=textColor or Color3.fromRGB(180,180,180); l.TextSize=fs or 13; l.Font=Enum.Font.Gotham; l.TextXAlignment=Enum.TextXAlignment.Left; l.TextWrapped=true
-    return l
-end
-
-local function mkSeparator(label)
-    local f = Instance.new("Frame"); f.Size=UDim2.new(1,-12,0,20); f.BackgroundColor3=Color3.fromRGB(30,30,45); f.BorderSizePixel=0; f.LayoutOrder=nextOrder(); f.Parent=scrollFrame; Instance.new("UICorner",f).CornerRadius=UDim.new(0,4)
-    local l = Instance.new("TextLabel",f); l.Size=UDim2.new(1,0,1,0); l.BackgroundTransparency=1; l.Text="── "..label.." ──"; l.TextColor3=Color3.fromRGB(120,120,160); l.TextSize=11; l.Font=Enum.Font.GothamBold
-end
-
-local function mkButton(text, color, h)
-    local f = Instance.new("Frame"); f.Size=UDim2.new(1,-12,0,h or 30); f.BackgroundTransparency=1; f.LayoutOrder=nextOrder(); f.Parent=scrollFrame
-    local b = Instance.new("TextButton",f); b.Size=UDim2.new(1,0,1,0); b.BackgroundColor3=color or Color3.fromRGB(60,60,80); b.BorderSizePixel=0; b.Text=text; b.TextColor3=Color3.new(1,1,1); b.TextSize=13; b.Font=Enum.Font.GothamBold; Instance.new("UICorner",b).CornerRadius=UDim.new(0,6)
-    return b
-end
-
-local function mkHalfButtons(t1,c1,t2,c2,h)
-    local f = Instance.new("Frame"); f.Size=UDim2.new(1,-12,0,h or 30); f.BackgroundTransparency=1; f.LayoutOrder=nextOrder(); f.Parent=scrollFrame
-    local b1 = Instance.new("TextButton",f); b1.Size=UDim2.new(0.5,-3,1,0); b1.Position=UDim2.new(0,0,0,0); b1.BackgroundColor3=c1; b1.BorderSizePixel=0; b1.Text=t1; b1.TextColor3=Color3.new(1,1,1); b1.TextSize=12; b1.Font=Enum.Font.GothamBold; Instance.new("UICorner",b1).CornerRadius=UDim.new(0,6)
-    local b2 = Instance.new("TextButton",f); b2.Size=UDim2.new(0.5,-3,1,0); b2.Position=UDim2.new(0.5,3,0,0); b2.BackgroundColor3=c2; b2.BorderSizePixel=0; b2.Text=t2; b2.TextColor3=Color3.new(1,1,1); b2.TextSize=12; b2.Font=Enum.Font.GothamBold; Instance.new("UICorner",b2).CornerRadius=UDim.new(0,6)
-    return b1, b2
-end
-
-local function mkToggle(label, default, onColor, cb)
-    local f = Instance.new("Frame"); f.Size=UDim2.new(1,-12,0,28); f.BackgroundColor3=Color3.fromRGB(35,35,50); f.BorderSizePixel=0; f.LayoutOrder=nextOrder(); f.Parent=scrollFrame; Instance.new("UICorner",f).CornerRadius=UDim.new(0,6)
-    local lbl = Instance.new("TextLabel",f); lbl.Size=UDim2.new(1,-54,1,0); lbl.Position=UDim2.new(0,6,0,0); lbl.BackgroundTransparency=1; lbl.Text=label; lbl.TextColor3=Color3.fromRGB(200,200,200); lbl.TextSize=12; lbl.Font=Enum.Font.GothamSemibold; lbl.TextXAlignment=Enum.TextXAlignment.Left; lbl.TextWrapped=true
-    local btn = Instance.new("TextButton",f); btn.Size=UDim2.new(0,46,0,22); btn.Position=UDim2.new(1,-50,0.5,-11); btn.BackgroundColor3=default and (onColor or Color3.fromRGB(40,160,40)) or Color3.fromRGB(60,60,80); btn.BorderSizePixel=0; btn.Text=default and "ON" or "OFF"; btn.TextColor3=Color3.fromRGB(220,220,220); btn.TextSize=11; btn.Font=Enum.Font.GothamBold; Instance.new("UICorner",btn).CornerRadius=UDim.new(1,0)
-    local st=default; btn.MouseButton1Click:Connect(function() st=not st; btn.Text=st and "ON" or "OFF"; btn.BackgroundColor3=st and (onColor or Color3.fromRGB(40,160,40)) or Color3.fromRGB(60,60,80); cb(st) end)
-    return btn
-end
-
-local function mkSlider(label, min, max, default, cb)
-    local lf = Instance.new("Frame"); lf.Size=UDim2.new(1,-12,0,32); lf.BackgroundTransparency=1; lf.LayoutOrder=nextOrder(); lf.Parent=scrollFrame
-    local lbl = Instance.new("TextLabel",lf); lbl.Size=UDim2.new(1,0,0,14); lbl.BackgroundTransparency=1; lbl.Text=label..": "..default; lbl.TextColor3=Color3.fromRGB(160,160,160); lbl.TextSize=11; lbl.Font=Enum.Font.Gotham; lbl.TextXAlignment=Enum.TextXAlignment.Left
-    local bg = Instance.new("Frame",lf); bg.Size=UDim2.new(1,0,0,8); bg.Position=UDim2.new(0,0,0,16); bg.BackgroundColor3=Color3.fromRGB(40,40,55); bg.BorderSizePixel=0; Instance.new("UICorner",bg).CornerRadius=UDim.new(1,0)
-    local fl = Instance.new("Frame",bg); fl.Size=UDim2.new((default-min)/(max-min),0,1,0); fl.BackgroundColor3=Color3.fromRGB(100,60,200); fl.BorderSizePixel=0; Instance.new("UICorner",fl).CornerRadius=UDim.new(1,0)
-    local th = Instance.new("Frame",bg); th.Size=UDim2.new(0,14,0,14); th.Position=UDim2.new((default-min)/(max-min),-7,0.5,-7); th.BackgroundColor3=Color3.fromRGB(200,150,255); th.BorderSizePixel=0; th.ZIndex=2; Instance.new("UICorner",th).CornerRadius=UDim.new(1,0)
-    local sd=false
-    local function upd(i) local r=math.clamp((i.Position.X-bg.AbsolutePosition.X)/bg.AbsoluteSize.X,0,1); local v=math.floor(r*(max-min)+min); fl.Size=UDim2.new(r,0,1,0); th.Position=UDim2.new(r,-7,0.5,-7); lbl.Text=label..": "..v; cb(v) end
-    bg.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then sd=true; upd(i) end end)
-    th.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then sd=true end end)
-    UserInputService.InputChanged:Connect(function(i) if sd and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then upd(i) end end)
-    UserInputService.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then sd=false end end)
-end
-
-local function mkCheckboxScroll(h)
-    local sf = Instance.new("ScrollingFrame"); sf.Size=UDim2.new(1,-12,0,h); sf.BackgroundColor3=Color3.fromRGB(18,18,28); sf.BorderSizePixel=0; sf.ScrollBarThickness=4; sf.ScrollBarImageColor3=Color3.fromRGB(100,60,200); sf.CanvasSize=UDim2.new(0,0,0,0); sf.ScrollingDirection=Enum.ScrollingDirection.Y; sf.LayoutOrder=nextOrder(); sf.Parent=scrollFrame; Instance.new("UICorner",sf).CornerRadius=UDim.new(0,6)
-    local l = Instance.new("UIListLayout",sf); l.Padding=UDim.new(0,3); l.SortOrder=Enum.SortOrder.LayoutOrder
-    local p = Instance.new("UIPadding",sf); p.PaddingTop=UDim.new(0,3); p.PaddingLeft=UDim.new(0,3); p.PaddingRight=UDim.new(0,3)
-    return sf, l
-end
-
-
-
-
-
-
--- ⚠ GOD MODE WARNING
-local gwCard = Instance.new("Frame")
-gwCard.Size = UDim2.new(1,-12,0,46)
-gwCard.BackgroundColor3 = Color3.fromRGB(55,30,0)
-gwCard.BorderSizePixel = 0
-gwCard.LayoutOrder = nextOrder()
-gwCard.Parent = scrollFrame
-Instance.new("UICorner", gwCard).CornerRadius = UDim.new(0,8)
-local gwStroke = Instance.new("UIStroke", gwCard)
-gwStroke.Color = Color3.fromRGB(255,180,0)
-gwStroke.Thickness = 1.5
-gwStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-local gwIcon = Instance.new("TextLabel", gwCard)
-gwIcon.Size = UDim2.new(0,32,1,0)
-gwIcon.Position = UDim2.new(0,6,0,0)
-gwIcon.BackgroundTransparency = 1
-gwIcon.Text = "👑"
-gwIcon.TextSize = 22
-gwIcon.Font = Enum.Font.GothamBold
-gwIcon.TextYAlignment = Enum.TextYAlignment.Center
-gwIcon.TextXAlignment = Enum.TextXAlignment.Center
-local gwText = Instance.new("TextLabel", gwCard)
-gwText.Size = UDim2.new(1,-44,1,0)
-gwText.Position = UDim2.new(0,40,0,0)
-gwText.BackgroundTransparency = 1
-gwText.Text = "⚠ Enable GOD MODE before farming!\nGo to the God tab to avoid dying from floors."
-gwText.TextColor3 = Color3.fromRGB(255,200,60)
-gwText.TextSize = 11
-gwText.Font = Enum.Font.GothamBold
-gwText.TextXAlignment = Enum.TextXAlignment.Left
-gwText.TextYAlignment = Enum.TextYAlignment.Center
-gwText.TextWrapped = true
-task.spawn(function()
-    local t = 0
-    while gwCard and gwCard.Parent do
-        t = t + 0.03
-        local b = (math.sin(t)+1)/2
-        gwStroke.Color = Color3.fromRGB(math.floor(200+b*55), math.floor(120+b*80), 0)
-        task.wait(0.04)
-    end
-end)
-
-
-
-
-
-
--- ─── STATUS LABELS ───────────────────────────────────────────
-mkSeparator("STATUS")
-LBL.Status  = mkLabel("Status: Idle",         Color3.fromRGB(180,180,180), 16, 13)
-LBL.Phase   = mkLabel("Phase: --",            Color3.fromRGB(100,180,255), 14, 11)
-LBL.Speed   = mkLabel("",                     Color3.fromRGB(200,200,100), 14, 11)
-LBL.Wave    = mkLabel("Waves: Safe",          Color3.fromRGB(100,255,100), 14, 11)
-LBL.Grabbed = mkLabel("Grabbed: 0",           Color3.fromRGB(100,255,100), 16, 13)
-LBL.Floor   = mkLabel("Floors: Scanning...",  Color3.fromRGB(255,160,60),  14, 11)
-LBL.SavedPos= mkLabel("Saved: None",          Color3.fromRGB(255,180,80),  14, 11)
-
-mkSeparator("TRIAL")
-LBL.TrialStatus   = mkLabel("Trial: OFF",          Color3.fromRGB(180,180,180), 16, 13)
-LBL.TrialDetail   = mkLabel("Requirement: --",     Color3.fromRGB(0,200,255),   14, 11)
-LBL.TrialCollect  = mkLabel("Collecting: --",      Color3.fromRGB(255,255,0),   14, 11)
-LBL.Tracker       = mkLabel("Tracker: Idle",       Color3.fromRGB(255,150,255), 14, 11)
-LBL.TrialProgress = mkLabel("Progress: 0/0",       Color3.fromRGB(0,255,100),   14, 11)
-LBL.Log           = mkLabel("Last: --",            Color3.fromRGB(130,130,160), 13, 10)
-
--- ─── SUB-TAB SWITCHER ────────────────────────────────────────
-mkSeparator("TARGETS")
-local tabBar = Instance.new("Frame"); tabBar.Size=UDim2.new(1,-12,0,28); tabBar.BackgroundColor3=Color3.fromRGB(18,18,28); tabBar.BorderSizePixel=0; tabBar.LayoutOrder=nextOrder(); tabBar.Parent=scrollFrame; Instance.new("UICorner",tabBar).CornerRadius=UDim.new(0,6)
-local brTabBtn = Instance.new("TextButton",tabBar); brTabBtn.Size=UDim2.new(0.5,-3,1,-4); brTabBtn.Position=UDim2.new(0,2,0,2); brTabBtn.BackgroundColor3=Color3.fromRGB(100,60,200); brTabBtn.BorderSizePixel=0; brTabBtn.Text="Brainrot"; brTabBtn.TextColor3=Color3.new(1,1,1); brTabBtn.TextSize=12; brTabBtn.Font=Enum.Font.GothamBold; Instance.new("UICorner",brTabBtn).CornerRadius=UDim.new(0,6)
-local lbTabBtn = Instance.new("TextButton",tabBar); lbTabBtn.Size=UDim2.new(0.5,-3,1,-4); lbTabBtn.Position=UDim2.new(0.5,1,0,2); lbTabBtn.BackgroundColor3=Color3.fromRGB(40,40,60); lbTabBtn.BorderSizePixel=0; lbTabBtn.Text="Lucky Blocks"; lbTabBtn.TextColor3=Color3.fromRGB(150,150,150); lbTabBtn.TextSize=12; lbTabBtn.Font=Enum.Font.GothamBold; Instance.new("UICorner",lbTabBtn).CornerRadius=UDim.new(0,6)
-
-local brScroll, brList = mkCheckboxScroll(110)
-local lbScroll, lbList = mkCheckboxScroll(110)
-lbScroll.Visible = false
-
-local function switchSubTab(tab)
-    ST.activeSubTab = tab
-    if tab=="Brainrot" then
-        brTabBtn.BackgroundColor3=Color3.fromRGB(100,60,200); brTabBtn.TextColor3=Color3.new(1,1,1)
-        lbTabBtn.BackgroundColor3=Color3.fromRGB(40,40,60);  lbTabBtn.TextColor3=Color3.fromRGB(150,150,150)
-        brScroll.Visible=true; lbScroll.Visible=false
-    else
-        lbTabBtn.BackgroundColor3=Color3.fromRGB(200,160,0); lbTabBtn.TextColor3=Color3.new(1,1,1)
-        brTabBtn.BackgroundColor3=Color3.fromRGB(40,40,60);  brTabBtn.TextColor3=Color3.fromRGB(150,150,150)
-        brScroll.Visible=false; lbScroll.Visible=true
-    end
-end
-brTabBtn.MouseButton1Click:Connect(function() switchSubTab("Brainrot") end)
-lbTabBtn.MouseButton1Click:Connect(function() switchSubTab("LuckyBlocks") end)
-
--- ─── CHECKBOX BUILDERS ───────────────────────────────────────
-local function createBrainrotCB(rn, idx)
-    local btn = Instance.new("TextButton"); btn.Size=UDim2.new(1,-6,0,28); btn.BackgroundColor3=Color3.fromRGB(35,35,50); btn.BorderSizePixel=0; btn.Text=""; btn.LayoutOrder=idx; btn.Parent=brScroll; Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
-    local ck = Instance.new("TextLabel",btn); ck.Size=UDim2.new(0,20,0,20); ck.Position=UDim2.new(0,4,0.5,-10); ck.BackgroundColor3=Color3.fromRGB(50,50,70); ck.BorderSizePixel=0; ck.Text=""; ck.TextSize=13; ck.TextColor3=Color3.fromRGB(100,255,100); ck.Font=Enum.Font.GothamBold; Instance.new("UICorner",ck).CornerRadius=UDim.new(0,4)
-    local lb = Instance.new("TextLabel",btn); lb.Size=UDim2.new(1,-60,1,0); lb.Position=UDim2.new(0,28,0,0); lb.BackgroundTransparency=1; lb.Text=rn; lb.TextColor3=getRarityColor(rn); lb.TextSize=12; lb.Font=Enum.Font.GothamSemibold; lb.TextXAlignment=Enum.TextXAlignment.Left
-    local cl = Instance.new("TextLabel",btn); cl.Size=UDim2.new(0,26,1,0); cl.Position=UDim2.new(1,-28,0,0); cl.BackgroundTransparency=1; cl.TextColor3=Color3.fromRGB(140,140,140); cl.TextSize=11; cl.Font=Enum.Font.Gotham
-    local fo = CFG.BRAINROT_PATH:FindFirstChild(rn); cl.Text=fo and tostring(#fo:GetChildren()) or "0"
-    btn.MouseButton1Click:Connect(function()
-        if ST.brainrotSelectedRarities[rn] then ST.brainrotSelectedRarities[rn]=nil; ck.Text=""; ck.BackgroundColor3=Color3.fromRGB(50,50,70)
-        else ST.brainrotSelectedRarities[rn]=true; ck.Text="Y"; ck.BackgroundColor3=Color3.fromRGB(40,100,40) end end)
-    ST.brainrotCheckboxes[rn]={Button=btn,Check=ck,CountLabel=cl,Label=lb}
-end
-
-local function createLuckyBlockCB(rn, idx)
-    local btn = Instance.new("TextButton"); btn.Size=UDim2.new(1,-6,0,28); btn.BackgroundColor3=Color3.fromRGB(35,35,50); btn.BorderSizePixel=0; btn.Text=""; btn.LayoutOrder=idx; btn.Parent=lbScroll; Instance.new("UICorner",btn).CornerRadius=UDim.new(0,6)
-    local ck = Instance.new("TextLabel",btn); ck.Size=UDim2.new(0,20,0,20); ck.Position=UDim2.new(0,4,0.5,-10); ck.BackgroundColor3=Color3.fromRGB(50,50,70); ck.BorderSizePixel=0; ck.Text=""; ck.TextSize=13; ck.TextColor3=Color3.fromRGB(255,220,80); ck.Font=Enum.Font.GothamBold; Instance.new("UICorner",ck).CornerRadius=UDim.new(0,4)
-    local lb = Instance.new("TextLabel",btn); lb.Size=UDim2.new(1,-60,1,0); lb.Position=UDim2.new(0,28,0,0); lb.BackgroundTransparency=1; lb.Text=rn; lb.TextColor3=getRarityColor(rn); lb.TextSize=12; lb.Font=Enum.Font.GothamSemibold; lb.TextXAlignment=Enum.TextXAlignment.Left
-    local cl = Instance.new("TextLabel",btn); cl.Size=UDim2.new(0,26,1,0); cl.Position=UDim2.new(1,-28,0,0); cl.BackgroundTransparency=1; cl.TextColor3=Color3.fromRGB(140,140,140); cl.TextSize=11; cl.Font=Enum.Font.Gotham; cl.Text="0"
-    local function countLBRarity()
-        local count = 0
-        for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetDescendants()) do
-            if extractLBRarity(c) == rn then count += 1 end
-        end
-        return count
-    end
-    cl.Text = tostring(countLBRarity())
-    btn.MouseButton1Click:Connect(function()
-        if ST.luckyBlockSelectedRarities[rn] then ST.luckyBlockSelectedRarities[rn]=nil; ck.Text=""; ck.BackgroundColor3=Color3.fromRGB(50,50,70)
-        else ST.luckyBlockSelectedRarities[rn]=true; ck.Text="Y"; ck.BackgroundColor3=Color3.fromRGB(100,80,0) end end)
-    ST.luckyBlockCheckboxes[rn]={Button=btn,Check=ck,CountLabel=cl,CountFn=countLBRarity}
-end
-
--- ─── CONTROLS ────────────────────────────────────────────────
-mkSeparator("CONTROLS")
-local startBtn                      = mkButton("▶ START", Color3.fromRGB(40,140,40), 34)
-local returnBtn, refreshBtn         = mkHalfButtons("↩ RETURN",Color3.fromRGB(180,100,0),"↺ REFRESH",Color3.fromRGB(40,80,160))
-local selAllBtn, savePosBtn         = mkHalfButtons("SELECT ALL",Color3.fromRGB(80,50,130),"SAVE POS",Color3.fromRGB(140,90,0))
-local scanBtn, towerBtn             = mkHalfButtons("SCAN TRIAL",Color3.fromRGB(0,130,180),"GO TOWER",Color3.fromRGB(160,90,0))
-
--- ─── SETTINGS ────────────────────────────────────────────────
-mkSeparator("SETTINGS")
-mkSlider("Speed",10,700,CFG.TWEEN_SPEED,  function(v) CFG.TWEEN_SPEED=v end)
-mkSlider("Depth",-200,3,CFG.TRAVEL_DEPTH,function(v) CFG.TRAVEL_DEPTH=v end)
-mkSlider("Grab H",0,20,CFG.GRAB_HEIGHT,   function(v) CFG.GRAB_HEIGHT=v end)
-mkSlider("Wave Dist",30,300,CFG.WAVE_SAFE_DISTANCE, function(v) CFG.WAVE_SAFE_DISTANCE=v end)
-mkToggle("Wave Safety",    true, Color3.fromRGB(255,100,100), function(v) ST.waveCheckEnabled=v end)
-mkToggle("Clear Floors",   true, Color3.fromRGB(255,160,60),  function(v) ST.floorClearEnabled=v; if not v then restoreFloors(); updateFloorLabel() end end)
-mkToggle("Instant Prompts",false,Color3.fromRGB(255,220,80),  function(v) if v then enableAutoInstant() else disableAutoInstant() end end)
-mkToggle("Auto Trial",     false,Color3.fromRGB(0,180,255),   function(v)
-    if v then
-        if not ST.autoTrialRunning then task.spawn(function() _startAutoTrialLoop() end) end
-    else
-        ST.autoTrialEnabled=false; ST.autoTrialRunning=false; ST.trialInProgress=false; ST.trialCollecting=false
-        stopContinuousTracker(); resetTracker(); restoreSelections()
-        if LBL.TrialStatus then LBL.TrialStatus.Text="Trial: OFF"; LBL.TrialStatus.TextColor3=Color3.fromRGB(180,180,180) end
-    end
-end)
-
-list:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    scrollFrame.CanvasSize = UDim2.new(0,0,0,list.AbsoluteContentSize.Y+10)
-end)
-
-local function updateSavedPosLabel()
-    if not LBL.SavedPos then return end
-    if ST.savedCFrame then
-        local p=ST.savedCFrame.Position
-        LBL.SavedPos.Text=string.format("Saved: X:%.0f Y:%.0f Z:%.0f",p.X,p.Y,p.Z)
-        LBL.SavedPos.TextColor3=Color3.fromRGB(100,255,180)
-    else LBL.SavedPos.Text="Saved: None"; LBL.SavedPos.TextColor3=Color3.fromRGB(255,180,80) end
-end
-
--- ============================================================
--- ============================================================
--- TRIAL LOOP
--- ============================================================
-local function doOneTrialRun()
-    ST.trialInProgress = true; ST.trialGrabbed = 0; ST.trialCollecting = false
-    resetTracker(); clearFloors(); updateFloorLabel(); saveSelections()
-
-    -- ── 1. Travel to tower (same depth pattern as smartTravelTo) ──
-    if LBL.TrialStatus then LBL.TrialStatus.Text = "Going to tower..."; LBL.TrialStatus.TextColor3 = Color3.fromRGB(255,200,0) end
-    local arrived = travelToTower()
-    if not arrived or not isAlive() then
-        restoreSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress = false
-        if LBL.TrialStatus then LBL.TrialStatus.Text = "Couldn't reach tower"; LBL.TrialStatus.TextColor3 = Color3.fromRGB(255,80,80) end
-        return false, "dead"
-    end
-    task.wait(0.3)
-
-    -- ── 2. Check cooldown ─────────────────────────────────────────
-    if isTrialOnCooldown() then
-        if LBL.TrialStatus then LBL.TrialStatus.Text = "Trial on cooldown"; LBL.TrialStatus.TextColor3 = Color3.fromRGB(255,80,80) end
-        restoreSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress = false
-        return false, "cooldown"
-    end
-
-    -- ── 3. Activate trial if not already running ──────────────────
-    if not isTrialTimerActive() then
-        if LBL.TrialStatus then LBL.TrialStatus.Text = "Activating trial..."; LBL.TrialStatus.TextColor3 = Color3.fromRGB(255,200,0) end
-        fireTrialPrompt(); task.wait(0.4)
-        fireTrialPrompt(); task.wait(0.4)
-        fireTrialPrompt(); task.wait(2.0)  -- wait for billboard to update
-    else
-        task.wait(0.5)
-    end
-
-    -- ── 4. Read billboard rarity ──────────────────────────────────
-    if LBL.TrialStatus then LBL.TrialStatus.Text = "Reading billboard..."; LBL.TrialStatus.TextColor3 = Color3.fromRGB(0,200,255) end
-    local dr, dc = nil, nil
-    for attempt = 1, 12 do
-        if not ST.autoTrialEnabled then break end
-        dr, dc = readInfoDirect()
-        if dr then break end
-        if LBL.Log then LBL.Log.Text = "Scanning billboard " .. attempt .. "/12" end
-        task.wait(0.5)
-    end
-    if not dr then dr, dc = scanWithRetry(6, 0.4) end
-    if not dr then
-        restoreSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress = false
-        if LBL.TrialStatus then LBL.TrialStatus.Text = "No rarity found"; LBL.TrialStatus.TextColor3 = Color3.fromRGB(255,80,80) end
-        return false, "no_rarity"
-    end
-
-    local fn = matchRarityFolder(dr)
-    if not fn then
-        restoreSelections(); restoreFloors(); updateFloorLabel(); ST.trialInProgress = false
-        if LBL.TrialStatus then LBL.TrialStatus.Text = "No folder: " .. dr; LBL.TrialStatus.TextColor3 = Color3.fromRGB(255,80,80) end
-        return false, "no_folder"
-    end
-
-    ST.currentTrialRarity = dr; ST.currentTrialFolder = fn
-    ST.trialRequired = dc or 1; ST.trialCollecting = true
-    autoSelectTrialRarity(fn); updateTrackerLabel(); startContinuousTracker()
-    if LBL.TrialStatus then LBL.TrialStatus.Text = string.format("Need %d %s", ST.trialRequired, fn); LBL.TrialStatus.TextColor3 = Color3.fromRGB(0,255,100) end
-    if LBL.TrialDetail  then LBL.TrialDetail.Text  = string.format("Folder: %s | Req: %d", fn, ST.trialRequired); LBL.TrialDetail.TextColor3 = Color3.fromRGB(0,200,255) end
-
-    -- ── 5. Collect & deliver loop ─────────────────────────────────
-    local ts = tick()
-    while ST.autoTrialEnabled and (tick() - ts) < CFG.TRIAL_TIME_LIMIT do
-        if not isAlive() then task.wait(0.5); continue end
-        refreshChar(); checkMapChange(); updateTrackerLabel()
-
-        -- Trial finished check
-        if not isTrialTimerActive() then
-            local r2 = readInfoDirect()
-            if not r2 then
-                stopContinuousTracker(); restoreSelections(); restoreFloors(); updateFloorLabel()
-                ST.trialInProgress = false; ST.trialCollecting = false
-                if LBL.TrialStatus then LBL.TrialStatus.Text = "Trial complete!"; LBL.TrialStatus.TextColor3 = Color3.fromRGB(0,255,100) end
-                return true, "completed"
-            end
-        end
-
-        -- Find closest brainrot of required rarity
-        local avail = getBrainrots({ST.currentTrialFolder})
-        if #avail == 0 then
-            if LBL.Phase then LBL.Phase.Text = "Waiting for brainrots..." end
-            task.wait(1); continue
-        end
-        if rootPart and rootPart.Parent then
-            local pos = rootPart.Position
-            table.sort(avail, function(a, b)
-                local da = a.Part and a.Part.Parent and (a.Part.Position - pos).Magnitude or math.huge
-                local db = b.Part and b.Part.Parent and (b.Part.Position - pos).Magnitude or math.huge
-                return da < db
-            end)
-        end
-        local tg = nil
-        for _, t in ipairs(avail) do
-            if t.Part and t.Part.Parent and t.Object and t.Object.Parent then tg = t; break end
-        end
-        if not tg then task.wait(0.5); continue end
-        if not ST.autoTrialEnabled then break end
-
-        local objectRef = tg.Object
-        local targetPos = tg.Part.CFrame.Position
-        if LBL.Phase  then LBL.Phase.Text  = "→ " .. tg.Name end
-        if LBL.Status then LBL.Status.Text = "[" .. tg.Rarity .. "] " .. tg.Name end
-
-        -- Wave safety
-        if ST.waveCheckEnabled and isWaveNear(targetPos, CFG.WAVE_SAFE_DISTANCE) then
-            waitWaveClear(targetPos, function(m) if LBL.Phase then LBL.Phase.Text = m end end)
-            if not ST.autoTrialEnabled then break end
-        end
-
-        -- Travel to brainrot — use returnTweenToken (isReturn=true) so it
-        -- cannot be stomped by activeTweenToken or towerTweenToken
-        local ok = smartTravelTo(targetPos, CFG.GRAB_HEIGHT, false, true)
-        if not ok or not isAlive() then task.wait(0.3); continue end
-        if not ST.autoTrialEnabled then break end
-        if not objectRef or not objectRef.Parent then continue end
-
-        local livePart = objectRef:IsA("Model") and (objectRef.PrimaryPart or objectRef:FindFirstChildWhichIsA("BasePart"))
-                      or (objectRef:IsA("BasePart") and objectRef or nil)
-        if not livePart or not livePart.Parent then continue end
-
-        local preGrabPos = livePart.Position
-        if LBL.Phase then LBL.Phase.Text = "Grabbing!" end
-        fullGrab(objectRef, livePart, livePart.Position); task.wait(0.5)
-        if not isAlive() then task.wait(0.3); continue end
-
-        -- Grab success check
-        local grabbed = false
-        if not objectRef or not objectRef.Parent then grabbed = true
-        elseif not objectRef.Parent:IsDescendantOf(CFG.BRAINROT_PATH) then grabbed = true
-        elseif livePart and livePart.Parent and (livePart.Position - preGrabPos).Magnitude > 5 then grabbed = true end
-        if not grabbed then
-            if LBL.Phase then LBL.Phase.Text = "Miss, retrying..." end
-            task.wait(0.2); continue
-        end
-
-        ST.trialGrabbed += 1; ST.totalGrabbed += 1
-        if LBL.Grabbed       then LBL.Grabbed.Text       = "Grabbed: " .. ST.totalGrabbed end
-        if LBL.TrialProgress then LBL.TrialProgress.Text = string.format("Progress: %d/%d", ST.trialGrabbed, ST.trialRequired) end
-
-        -- Deliver: travel back to tower using same depth travel
-        if LBL.Phase then LBL.Phase.Text = "↓ Delivering..." end
-        if LBL.TrialStatus then LBL.TrialStatus.Text = "Delivering to tower..."; LBL.TrialStatus.TextColor3 = Color3.fromRGB(255,200,0) end
-        local delivered = travelToTower()
-        if not delivered or not isAlive() then task.wait(0.3); continue end
-
-        task.wait(0.2)
-        fireTrialPrompt(); task.wait(0.3)
-        fireTrialPrompt(); task.wait(0.3)
-        fireTrialPrompt(); task.wait(0.4)
-        if not ST.autoTrialEnabled then break end
-
-        -- Re-read billboard after delivery
-        local nr, nc = readInfoDirect()
-        if not nr then
-            stopContinuousTracker(); restoreSelections(); restoreFloors(); updateFloorLabel()
-            ST.trialInProgress = false; ST.trialCollecting = false
-            if LBL.TrialStatus then LBL.TrialStatus.Text = "Trial complete!"; LBL.TrialStatus.TextColor3 = Color3.fromRGB(0,255,100) end
-            return true, "completed"
-        end
-        local nf = matchRarityFolder(nr)
-        if nf and nf ~= ST.currentTrialFolder then
-            ST.previousTrialRarity = ST.currentTrialRarity; ST.currentTrialRarity = nr
-            ST.currentTrialFolder = nf; ST.trialRequired = nc or 1; ST.rarityChangeCount += 1
-            autoSelectTrialRarity(nf)
-            if LBL.TrialStatus then LBL.TrialStatus.Text = string.format("Changed! Need %d %s", nc or 1, nf); LBL.TrialStatus.TextColor3 = Color3.fromRGB(255,200,0) end
-        elseif nf then
-            ST.trialRequired = nc or ST.trialRequired
-            if LBL.TrialStatus then LBL.TrialStatus.Text = string.format("Need %d %s", ST.trialRequired, nf); LBL.TrialStatus.TextColor3 = Color3.fromRGB(0,255,100) end
-        end
-        updateTrackerLabel(); task.wait(0.1)
-    end
-
-    stopContinuousTracker(); restoreSelections(); restoreFloors(); updateFloorLabel()
-    ST.trialInProgress = false; ST.trialCollecting = false
-    return true, "timeout"
-end
-
-function _startAutoTrialLoop()
-    if ST.autoTrialRunning then return end
-    ST.autoTrialEnabled = true; ST.autoTrialRunning = true
-    if not ST.savedCFrame then
-        if rootPart and rootPart.Parent then ST.savedCFrame = rootPart.CFrame; updateSavedPosLabel() end
-    end
-    if LBL.TrialStatus then LBL.TrialStatus.Text = "Trial: ACTIVE"; LBL.TrialStatus.TextColor3 = Color3.fromRGB(0,200,255) end
-    enableNoclip(); lockPhysics()
-    while ST.autoTrialEnabled do
-        local ok, reason = doOneTrialRun()
-        stopContinuousTracker(); restoreFloors(); updateFloorLabel()
-        if not ST.autoTrialEnabled then break end
-        if reason == "cooldown" then
-            -- poll until cooldown actually clears
-            if LBL.TrialStatus then LBL.TrialStatus.Text = "Waiting for cooldown..."; LBL.TrialStatus.TextColor3 = Color3.fromRGB(150,150,150) end
-            repeat task.wait(2) until not isTrialOnCooldown() or not ST.autoTrialEnabled
-        elseif reason == "no_rarity" or reason == "no_folder" or reason == "dead" then
-            if LBL.TrialStatus then LBL.TrialStatus.Text = "Retrying in 3s..."; LBL.TrialStatus.TextColor3 = Color3.fromRGB(255,150,0) end
-            task.wait(3)
-        else
-            -- completed / timeout: wait between runs
-            for i = CFG.TRIAL_COOLDOWN_WAIT, 1, -1 do
-                if not ST.autoTrialEnabled then break end
-                if LBL.TrialStatus then LBL.TrialStatus.Text = string.format("Next run in %ds...", i); LBL.TrialStatus.TextColor3 = Color3.fromRGB(150,150,150) end
-                task.wait(1)
-            end
-        end
-    end
-    ST.autoTrialRunning = false; stopContinuousTracker(); restoreFloors(); updateFloorLabel()
-    if not ST.running then unlockPhysics(); disableNoclip() end
-    if LBL.TrialStatus then LBL.TrialStatus.Text = "Trial: OFF"; LBL.TrialStatus.TextColor3 = Color3.fromRGB(180,180,180) end
-end
-
--- ============================================================
--- FARMING LOOP
--- ============================================================
-local function stopAndReturn()
-    if ST.stopping then return end
-    ST.stopping          = true
-    ST.running           = false
-    ST.autoTrialEnabled  = false
-    ST.autoTrialRunning  = false
-    ST.trialInProgress   = false
-    ST.trialCollecting   = false
-    -- clear farming/tower tweens but NOT returnTweenToken — doTweenReturn manages that itself
-    ST.activeTweenToken = nil
-    ST.towerTweenToken  = nil
-    ST.tweening         = false
-    stopContinuousTracker(); resetTracker(); restoreSelections()
-    if LBL.Status then LBL.Status.Text = "Returning..." end
-    startBtn.Text = "↩ RETURNING..."; startBtn.BackgroundColor3 = Color3.fromRGB(200,130,0)
-
-    local function finishReturn()
-        ST.stopping = false
-        unlockPhysics(); disableNoclip(); restoreFloors(); updateFloorLabel()
-        startBtn.Text = "▶ START"; startBtn.BackgroundColor3 = Color3.fromRGB(40,140,40)
-        if LBL.Status then LBL.Status.Text = "Stopped" end
-        if LBL.Phase  then LBL.Phase.Text  = "--" end
-        if LBL.Speed  then LBL.Speed.Text  = "" end
-    end
-
-    task.spawn(function()
-        -- wait two frames so cleared tokens propagate
-        RunService.Heartbeat:Wait()
-        RunService.Heartbeat:Wait()
-
-        -- wait until alive
-        local dw = 0
-        while not isAlive() and dw < 10 do task.wait(0.3); dw += 0.3 end
-        if not isAlive() then finishReturn(); return end
-
-        if not ST.savedCFrame then
-            finishReturn(); return
-        end
-
-        enableNoclip(); lockPhysics()
-        refreshChar()
-
-        local savedPos = ST.savedCFrame.Position
-        local myPos    = rootPart.Position
-
-        -- Phase 1: dive underground from current position
-        if LBL.Phase then LBL.Phase.Text = "↓ Returning..." end
-        local ok1 = doTweenReturn(
-            CFrame.new(myPos.X, myPos.Y + CFG.TRAVEL_DEPTH, myPos.Z),
-            CFG.DIVE_SPEED, 2
-        )
-        if not ok1 then
-            -- tween was interrupted (e.g. died mid-dive) — still try to finish
-            if not isAlive() then finishReturn(); return end
-        end
-
-        -- Phase 2: travel horizontally underground to saved XZ
-        if LBL.Phase then LBL.Phase.Text = "→ Returning..." end
-        local curY = rootPart.Position.Y
-        local ok2 = doTweenReturn(
-            CFrame.new(savedPos.X, curY, savedPos.Z),
-            CFG.TWEEN_SPEED, 0
-        )
-        if not ok2 then
-            if not isAlive() then finishReturn(); return end
-        end
-
-        -- Phase 3: wave check before rising
-        if ST.waveCheckEnabled then
-            local wt = tick()
-            while isWaveNear(savedPos, CFG.WAVE_SAFE_DISTANCE) and tick()-wt < CFG.WAVE_MAX_WAIT do
-                if LBL.Phase then LBL.Phase.Text = "↑ Waiting for wave..." end
-                task.wait(CFG.WAVE_CHECK_INTERVAL)
-            end
-        end
-
-        -- Phase 4: rise up to saved position
-        if LBL.Phase then LBL.Phase.Text = "↑ Returning..." end
-        doTweenReturn(ST.savedCFrame, CFG.RISE_SPEED, 2)
-
-        finishReturn()
-    end)
-end
-
-local function startFarming()
-    if ST.running then return end; ST.running=true; ST.farmingTab=ST.activeSubTab
-    if not ST.savedCFrame and rootPart and rootPart.Parent then ST.savedCFrame=rootPart.CFrame; updateSavedPosLabel() end
-    enableNoclip(); lockPhysics(); clearFloors(); updateFloorLabel()
-    if LBL.Status then LBL.Status.Text="Running..." end
-    startBtn.Text="⏹ STOP"; startBtn.BackgroundColor3=Color3.fromRGB(60,60,140)
-    task.spawn(function()
-        refreshChar()
-        if isAlive() and rootPart.Position.Y > CFG.TRAVEL_DEPTH + 10 then
-            if LBL.Phase then LBL.Phase.Text="↓ Initial dive..." end
-            doTween(CFrame.new(rootPart.Position.X, rootPart.Position.Y + CFG.TRAVEL_DEPTH, rootPart.Position.Z), CFG.DIVE_SPEED, 2, false)
-        end
-        while ST.running do
-            if not isAlive() then if LBL.Status then LBL.Status.Text="Dead - waiting..." end; task.wait(0.5); continue end
-            if ST.trialInProgress or ST.trialCollecting then task.wait(0.5); continue end
-            if not ST.running then break end
-            refreshChar(); checkMapChange()
-            if not hasSelections() then if LBL.Status then LBL.Status.Text="No rarity selected!" end; task.wait(1); continue end
-            local targets=getTargetsSorted()
-            if #targets==0 then if LBL.Status then LBL.Status.Text="No targets..." end; task.wait(0.8); continue end
-            for _,target in ipairs(targets) do
-                if not ST.running then break end
-                if not isAlive() then break end
-                if not target.Part or not target.Part.Parent or not target.Object or not target.Object.Parent then continue end
-                refreshChar(); local tp=target.Part.CFrame.Position
-                if LBL.Status then LBL.Status.Text="["..target.Rarity.."] "..target.Name end
-                smartTravelTo(tp, CFG.GRAB_HEIGHT, false, false)
-                if not ST.running or not isAlive() then break end
-                if ST.waveCheckEnabled and isWaveNear(rootPart.Position, CFG.WAVE_SAFE_DISTANCE * 0.5) then
-                    doTween(CFrame.new(rootPart.Position.X, rootPart.Position.Y + CFG.TRAVEL_DEPTH, rootPart.Position.Z), CFG.DIVE_SPEED * 2, 0, false)
-                    task.wait(0.3); continue
-                end
-                if not target.Part or not target.Part.Parent then continue end
-                if LBL.Phase then LBL.Phase.Text="Grabbing!" end
-                fullGrab(target.Object, target.Part, tp)
-                ST.totalGrabbed += 1
-                if LBL.Grabbed then LBL.Grabbed.Text="Grabbed: "..ST.totalGrabbed end
-                if LBL.Log then LBL.Log.Text="["..target.Rarity.."] "..target.Name end
-                task.wait(CFG.WAIT_AT_TARGET)
-                if not ST.running then break end
-                if not isAlive() then break end
-                if LBL.Phase then LBL.Phase.Text="↓ Diving..." end
-                refreshChar()
-                doTween(CFrame.new(rootPart.Position.X, rootPart.Position.Y + CFG.TRAVEL_DEPTH, rootPart.Position.Z), CFG.DIVE_SPEED, 2, false)
-            end
-            if not ST.running then break end
-            if not CFG.AUTO_LOOP then ST.running=false; break end
-            task.wait(0.2)
-        end
-        if not ST.autoTrialRunning and not ST.stopping then
-            restoreFloors(); updateFloorLabel(); unlockPhysics(); disableNoclip()
-            startBtn.Text="▶ START"; startBtn.BackgroundColor3=Color3.fromRGB(40,140,40)
-            if LBL.Status then LBL.Status.Text="Stopped" end
-            if LBL.Phase then LBL.Phase.Text="--" end
-        end
-    end)
-end
-
--- ============================================================
--- BUTTON CONNECTIONS
--- ============================================================
-startBtn.MouseButton1Click:Connect(function()
-    if ST.stopping then return end
-    if ST.running then stopAndReturn() else startFarming() end
-end)
-
-returnBtn.MouseButton1Click:Connect(function()
-    if not ST.stopping then stopAndReturn() end
-end)
-
-refreshBtn.MouseButton1Click:Connect(function()
-    for _,d in pairs(ST.brainrotCheckboxes) do d.Button:Destroy() end; ST.brainrotCheckboxes={}
-    local folders=scanBrainrotFolders()
-    for i,n in ipairs(folders) do createBrainrotCB(n,i) end
-    local l=brScroll:FindFirstChildOfClass("UIListLayout")
-    if l then brScroll.CanvasSize=UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8) end
-    for _,d in pairs(ST.luckyBlockCheckboxes) do d.Button:Destroy() end; ST.luckyBlockCheckboxes={}
-    local lbRarities={}; local seen={}
-    local function deepScanLB(obj)
-        local r=extractLBRarity(obj); if r and not seen[r] then seen[r]=true; table.insert(lbRarities,r) end
-    end
-    for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetDescendants()) do deepScanLB(c) end
-    table.sort(lbRarities)
-    for i,n in ipairs(lbRarities) do createLuckyBlockCB(n,i) end
-    local ll=lbScroll:FindFirstChildOfClass("UIListLayout")
-    if ll then lbScroll.CanvasSize=UDim2.new(0,0,0,ll.AbsoluteContentSize.Y+8) end
-    if LBL.Log then LBL.Log.Text="Refreshed!" end
-end)
-
-selAllBtn.MouseButton1Click:Connect(function()
-    if ST.activeSubTab=="Brainrot" then
-        local all=true; for n in pairs(ST.brainrotCheckboxes) do if not ST.brainrotSelectedRarities[n] then all=false; break end end
-        for n,d in pairs(ST.brainrotCheckboxes) do
-            if all then ST.brainrotSelectedRarities[n]=nil; d.Check.Text=""; d.Check.BackgroundColor3=Color3.fromRGB(50,50,70)
-            else ST.brainrotSelectedRarities[n]=true; d.Check.Text="Y"; d.Check.BackgroundColor3=Color3.fromRGB(40,100,40) end end
-    else
-        local all=true; for n in pairs(ST.luckyBlockCheckboxes) do if not ST.luckyBlockSelectedRarities[n] then all=false; break end end
-        for n,d in pairs(ST.luckyBlockCheckboxes) do
-            if all then ST.luckyBlockSelectedRarities[n]=nil; d.Check.Text=""; d.Check.BackgroundColor3=Color3.fromRGB(50,50,70)
-            else ST.luckyBlockSelectedRarities[n]=true; d.Check.Text="Y"; d.Check.BackgroundColor3=Color3.fromRGB(100,80,0) end end
-    end
-end)
-
-savePosBtn.MouseButton1Click:Connect(function()
-    if rootPart and rootPart.Parent then
-        ST.savedCFrame=rootPart.CFrame; updateSavedPosLabel()
-        savePosBtn.BackgroundColor3=Color3.fromRGB(40,180,40)
-        task.delay(0.5,function() savePosBtn.BackgroundColor3=Color3.fromRGB(140,90,0) end)
-        if LBL.Log then LBL.Log.Text="Position saved!" end
-    end
-end)
-
-scanBtn.MouseButton1Click:Connect(function()
-    local r,c=scanWithRetry(4,0.3)
-    if r then
-        local f=matchRarityFolder(r)
-        if LBL.TrialDetail then LBL.TrialDetail.Text=string.format("Need: %d %s → %s",c or 1,r,f or "NONE"); LBL.TrialDetail.TextColor3=Color3.fromRGB(0,255,100) end
-    else
-        if LBL.TrialDetail then LBL.TrialDetail.Text="No rarity found!"; LBL.TrialDetail.TextColor3=Color3.fromRGB(255,80,80) end
-    end
-end)
-
-towerBtn.MouseButton1Click:Connect(function()
-    if ST.running then return end
-    task.spawn(function()
-        enableNoclip(); lockPhysics(); clearFloors(); updateFloorLabel()
-        travelToTower(); task.wait(0.2); fireTrialPrompt(); task.wait(0.3)
-        local r,c=scanWithRetry(4,0.3)
-        if r then local f=matchRarityFolder(r)
-            if LBL.TrialDetail then LBL.TrialDetail.Text=string.format("Need: %d %s → %s",c or 1,r,f or "NONE"); LBL.TrialDetail.TextColor3=Color3.fromRGB(0,255,100) end
-        else if LBL.TrialDetail then LBL.TrialDetail.Text="No rarity"; LBL.TrialDetail.TextColor3=Color3.fromRGB(255,80,80) end end
-        restoreFloors(); updateFloorLabel(); unlockPhysics(); disableNoclip()
-    end)
-end)
-
--- ============================================================
--- RESPAWN HANDLER
--- ============================================================
-local function bindDeath()
-    if humanoid then humanoid.Died:Connect(function()
-        stopAllTweens()
-        if LBL.Status then LBL.Status.Text="Died..." end
-    end) end
-end
-bindDeath()
-
-player.CharacterAdded:Connect(function(char)
-    ST.respawning=true; stopAllTweens()
-    if ST.bodyVel  and ST.bodyVel.Parent  then ST.bodyVel:Destroy()  end
-    if ST.bodyGyro and ST.bodyGyro.Parent then ST.bodyGyro:Destroy() end
-    ST.bodyVel=nil; ST.bodyGyro=nil; ST.physicsLocked=false
-    if ST.frameConn then ST.frameConn:Disconnect(); ST.frameConn=nil end
-    character=char; humanoid=char:WaitForChild("Humanoid"); rootPart=char:WaitForChild("HumanoidRootPart")
-    bindDeath()
-    local waited=0; repeat task.wait(0.1); waited+=0.1 until (humanoid.Health>0) or (waited>5)
-    task.wait(1.5); ST.respawning=false
-    if ST.running or ST.autoTrialRunning then
-        enableNoclip(); lockPhysics()
-        if LBL.Status then LBL.Status.Text="Respawned - resuming..." end
-    end
-end)
-
--- ============================================================
--- WAVE LABEL UPDATER
--- ============================================================
-RunService.Heartbeat:Connect(function()
-    if P.Visible then updateWaveLabel() end
-end)
-
--- ============================================================
--- INITIAL POPULATE
--- ============================================================
-local function initialPopulate()
-    local folders=scanBrainrotFolders()
-    for i,n in ipairs(folders) do createBrainrotCB(n,i) end
-    local l=brScroll:FindFirstChildOfClass("UIListLayout")
-    if l then
-        l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            brScroll.CanvasSize=UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8) end)
-        brScroll.CanvasSize=UDim2.new(0,0,0,l.AbsoluteContentSize.Y+8)
-    end
-    local seen={}; local lbRarities={}
-    local function deepScanLBInit(obj)
-        local r=extractLBRarity(obj); if r and not seen[r] then seen[r]=true; table.insert(lbRarities,r) end
-    end
-    for _,c in pairs(CFG.LUCKYBLOCK_PATH:GetDescendants()) do deepScanLBInit(c) end
-    table.sort(lbRarities)
-    for i,n in ipairs(lbRarities) do createLuckyBlockCB(n,i) end
-    local ll=lbScroll:FindFirstChildOfClass("UIListLayout")
-    if ll then
-        ll:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-            lbScroll.CanvasSize=UDim2.new(0,0,0,ll.AbsoluteContentSize.Y+8) end)
-        lbScroll.CanvasSize=UDim2.new(0,0,0,ll.AbsoluteContentSize.Y+8)
-    end
-end
-
-task.spawn(function()
-    initialPopulate(); startMapWatcher()
-    updateSavedPosLabel(); updateFloorLabel()
-    if LBL.Status then LBL.Status.Text="Ready — select rarities & START" end
-    local lastBK=""
-    while P and P.Parent do
-        local folders=scanBrainrotFolders(); local bk=table.concat(folders,"|")
-        if bk~=lastBK then
-            local saved={}; for n,v in pairs(ST.brainrotSelectedRarities) do saved[n]=v end
-            for _,d in pairs(ST.brainrotCheckboxes) do d.Button:Destroy() end; ST.brainrotCheckboxes={}
-            for i,n in ipairs(folders) do createBrainrotCB(n,i) end
-            for n,v in pairs(saved) do if v and ST.brainrotCheckboxes[n] then
-                ST.brainrotSelectedRarities[n]=true; ST.brainrotCheckboxes[n].Check.Text="Y"
-                ST.brainrotCheckboxes[n].Check.BackgroundColor3=Color3.fromRGB(40,100,40) end end
-            lastBK=bk
-        else
-            for n,d in pairs(ST.brainrotCheckboxes) do
-                local f=CFG.BRAINROT_PATH:FindFirstChild(n)
-                d.CountLabel.Text=f and tostring(#f:GetChildren()) or "0"
-            end
-            for n,d in pairs(ST.luckyBlockCheckboxes) do
-                if d.CountFn then
-                    pcall(function() d.CountLabel.Text=tostring(d.CountFn()) end)
-                end
-            end
-        end
-        task.wait(2)
-    end
-end)
-
-end
 
 -- ════════════════════════════════════════
 -- // ═══ TAB: GOD MODE ═══
