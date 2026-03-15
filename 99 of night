@@ -5,9 +5,10 @@ local playerGui = player:WaitForChild("PlayerGui")
 if playerGui:FindFirstChild("CtrlUI") then playerGui.CtrlUI:Destroy() end
 
 local mob = UIS.TouchEnabled and not UIS.KeyboardEnabled
-local GW = mob and 340 or 720
-local GH = mob and 520 or 490
-local SW = mob and 110 or 160
+local GW = mob and 360 or 720
+local GH = mob and 420 or 490
+local SW = mob and 120 or 160
+local CPad = mob and 10 or 14
 local CPad = mob and 10 or 14
 local LS = mob and 11 or 13
 local HH = mob and 40 or 44
