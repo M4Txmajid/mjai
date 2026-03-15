@@ -8,8 +8,6 @@ local mob = UIS.TouchEnabled and not UIS.KeyboardEnabled
 local GW = mob and 370 or 720
 local GH = mob and 340 or 490
 local SW = mob and 125 or 160
-local CPad = mob and 10 or 14
-local CPad = mob and 10 or 14
 local LS = mob and 11 or 13
 local HH = mob and 40 or 44
 local TCH = mob and 56 or 62
@@ -52,17 +50,21 @@ corner(root,14)
 local rootStroke = new("UIStroke",root,{Color=ct.acc1,Thickness=1,Transparency=0.6})
 
 -- DRAG
+local dragOffsetX, dragOffsetY = 0, 0
+
 local function onDragBegan(pos)
-	dragging=true; dragStart=pos
-	startPos=UDim2.new(0,root.Position.X.Offset,0,root.Position.Y.Offset)
+	dragging = true
+	dragOffsetX = pos.X - root.AbsolutePosition.X
+	dragOffsetY = pos.Y - root.AbsolutePosition.Y
 end
 local function onDragMoved(pos)
 	if not dragging then return end
-	local d=pos-dragStart
-	local x,y=startPos.X.Offset+d.X,startPos.Y.Offset+d.Y
-	root.Position=UDim2.new(0,x,0,y)
-	shadow.Position=UDim2.new(0,x-4,0,y+4)
+	local x = pos.X - dragOffsetX
+	local y = pos.Y - dragOffsetY
+	root.Position = UDim2.new(0, x, 0, y)
+	shadow.Position = UDim2.new(0, x - 4, 0, y + 4)
 end
+local function onDragEnded() dragging = false end
 local function onDragEnded() dragging=false end
 local function wireDrag(h)
 	h.InputBegan:Connect(function(i)
