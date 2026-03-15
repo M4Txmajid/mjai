@@ -514,13 +514,12 @@ do
 
 	local mob=UIS.TouchEnabled and not UIS.KeyboardEnabled
 
-	-- Mobile: dynamically fit to screen size
-	local screenSize = workspace.CurrentCamera.ViewportSize
+	-- Sizes
 	local GW, GH, SW, CPad, LS, HH, TCH
 	if mob then
-		GW   = math.floor(screenSize.X * 0.96)
-		GH   = math.floor(screenSize.Y * 0.88)
-		SW   = math.floor(GW * 0.28)
+		GW   = 340
+		GH   = 420
+		SW   = 100
 		CPad = 8
 		LS   = 11
 		HH   = 38
@@ -576,11 +575,31 @@ do
 	local rootStroke=newI("UIStroke",root,{Color=ct.acc1,Thickness=1,Transparency=0.6})
 
 	local function onDragBegan(pos) dragging=true; dragStart=pos; local a=root.AbsolutePosition; startPos=UDim2.new(0,a.X,0,a.Y) end
-	local function onDragMoved(pos) if not dragging then return end; local d=pos-dragStart; local x,y=startPos.X.Offset+d.X,startPos.Y.Offset+d.Y; root.Position=UDim2.new(0,x,0,y); shadow.Position=UDim2.new(0,x-4,0,y+4) end
+	local function onDragMoved(pos)
+		if not dragging then return end
+		local d=pos-dragStart
+		local x=math.clamp(startPos.X.Offset+d.X, 0, workspace.CurrentCamera.ViewportSize.X - GW)
+		local y=math.clamp(startPos.Y.Offset+d.Y, 0, workspace.CurrentCamera.ViewportSize.Y - GH)
+		root.Position=UDim2.new(0,x,0,y); shadow.Position=UDim2.new(0,x-4,0,y+4)
+	end
 	local function onDragEnded() dragging=false end
 	local function wireDrag(h)
-		h.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then onDragBegan(i.Position) elseif i.UserInputType==Enum.UserInputType.Touch and not activeTouchId then activeTouchId=i.KeyCode; onDragBegan(i.Position) end end)
-		h.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 then onDragEnded() elseif i.UserInputType==Enum.UserInputType.Touch and i.KeyCode==activeTouchId then activeTouchId=nil; onDragEnded() end end)
+		h.InputBegan:Connect(function(i)
+			if i.UserInputType==Enum.UserInputType.MouseButton1 then
+				onDragBegan(i.Position)
+			elseif i.UserInputType==Enum.UserInputType.Touch and not activeTouchId then
+				activeTouchId=i.KeyCode; onDragBegan(i.Position)
+			end
+		end)
+		h.InputChanged:Connect(function(i)
+			if i.UserInputType==Enum.UserInputType.Touch and activeTouchId then
+				onDragMoved(i.Position)
+			end
+		end)
+		h.InputEnded:Connect(function(i)
+			if i.UserInputType==Enum.UserInputType.MouseButton1 then onDragEnded()
+			elseif i.UserInputType==Enum.UserInputType.Touch and i.KeyCode==activeTouchId then activeTouchId=nil; onDragEnded() end
+		end)
 	end
 	UIS.InputChanged:Connect(function(i)
 		if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then onDragMoved(i.Position) end
