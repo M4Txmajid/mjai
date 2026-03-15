@@ -517,9 +517,9 @@ do
 	-- Sizes
 	local GW, GH, SW, CPad, LS, HH, TCH
 	if mob then
-		GW   = 340
-		GH   = 420
-		SW   = 100
+		GW   = 380
+		GH   = 440
+		SW   = 108
 		CPad = 8
 		LS   = 11
 		HH   = 38
@@ -574,35 +574,60 @@ do
 	local root=newI("Frame",sg,{Name="Root",Size=UDim2.new(0,GW,0,GH),Position=UDim2.new(0.5,-(GW/2),0.5,-(GH/2)),BackgroundColor3=ct.bg1,BorderSizePixel=0,ZIndex=2,ClipsDescendants=true}); corner(root,14)
 	local rootStroke=newI("UIStroke",root,{Color=ct.acc1,Thickness=1,Transparency=0.6})
 
-	local function onDragBegan(pos) dragging=true; dragStart=pos; local a=root.AbsolutePosition; startPos=UDim2.new(0,a.X,0,a.Y) end
-	local function onDragMoved(pos)
-		if not dragging then return end
-		local d=pos-dragStart
-		local x=math.clamp(startPos.X.Offset+d.X, 0, workspace.CurrentCamera.ViewportSize.X - GW)
-		local y=math.clamp(startPos.Y.Offset+d.Y, 0, workspace.CurrentCamera.ViewportSize.Y - GH)
-		root.Position=UDim2.new(0,x,0,y); shadow.Position=UDim2.new(0,x-4,0,y+4)
+	-- DRAG: track delta from last position, not from start
+	-- This prevents the jump-to-cursor bug on both PC and mobile
+	local lastDragPos = nil
+
+	local function onDragBegan(pos)
+		dragging = true
+		lastDragPos = pos
 	end
-	local function onDragEnded() dragging=false end
+	local function onDragMoved(pos)
+		if not dragging or not lastDragPos then return end
+		local dx = pos.X - lastDragPos.X
+		local dy = pos.Y - lastDragPos.Y
+		lastDragPos = pos
+		local vp = workspace.CurrentCamera.ViewportSize
+		local curX = root.Position.X.Offset
+		local curY = root.Position.Y.Offset
+		local nx = math.clamp(curX + dx, 0, vp.X - GW)
+		local ny = math.clamp(curY + dy, 0, vp.Y - GH)
+		root.Position   = UDim2.new(0, nx, 0, ny)
+		shadow.Position = UDim2.new(0, nx - 4, 0, ny + 4)
+	end
+	local function onDragEnded()
+		dragging = false
+		lastDragPos = nil
+	end
+
 	local function wireDrag(h)
 		h.InputBegan:Connect(function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 then
+			if i.UserInputType == Enum.UserInputType.MouseButton1 then
 				onDragBegan(i.Position)
-			elseif i.UserInputType==Enum.UserInputType.Touch and not activeTouchId then
-				activeTouchId=i.KeyCode; onDragBegan(i.Position)
+			elseif i.UserInputType == Enum.UserInputType.Touch and not activeTouchId then
+				activeTouchId = i.KeyCode
+				onDragBegan(i.Position)
 			end
 		end)
 		h.InputChanged:Connect(function(i)
-			if i.UserInputType==Enum.UserInputType.Touch and activeTouchId then
+			if i.UserInputType == Enum.UserInputType.Touch and activeTouchId then
 				onDragMoved(i.Position)
 			end
 		end)
 		h.InputEnded:Connect(function(i)
-			if i.UserInputType==Enum.UserInputType.MouseButton1 then onDragEnded()
-			elseif i.UserInputType==Enum.UserInputType.Touch and i.KeyCode==activeTouchId then activeTouchId=nil; onDragEnded() end
+			if i.UserInputType == Enum.UserInputType.MouseButton1 then
+				onDragEnded()
+			elseif i.UserInputType == Enum.UserInputType.Touch and i.KeyCode == activeTouchId then
+				activeTouchId = nil
+				onDragEnded()
+			end
 		end)
 	end
+
 	UIS.InputChanged:Connect(function(i)
-		if dragging and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then onDragMoved(i.Position) end
+		if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+			onDragMoved(i.Position)
+		end
 		if activeSlider and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
 			local s=activeSlider; local mx=i.Position.X-s.track.AbsolutePosition.X; local p=math.clamp(mx/s.track.AbsoluteSize.X,0,1); local v=math.floor(s.minV+p*(s.maxV-s.minV))
 			s.fill.Size=UDim2.new(p,0,1,0); s.thumb.Position=UDim2.new(p,0,0.5,0); s.badge.Text=tostring(v); if s.cb then s.cb(v) end
