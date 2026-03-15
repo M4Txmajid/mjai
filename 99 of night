@@ -25,7 +25,6 @@ local T = {
 local tOrder = {"Midnight","Aurora","Obsidian","Crimson","Arctic","Forest","Solar"}
 local ct = T.Midnight
 local dragging, activeSlider, activeTouchId = false, nil, nil
-local dragOffsetX, dragOffsetY = 0, 0
 
 -- helpers
 local function tw(o,p,d) TweenService:Create(o,TweenInfo.new(d or 0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),p):Play() end
@@ -51,48 +50,45 @@ local root = new("Frame",sg,{Name="Root",Size=UDim2.new(0,GW,0,GH),Position=UDim
 corner(root,14)
 local rootStroke = new("UIStroke",root,{Color=ct.acc1,Thickness=1,Transparency=0.6})
 
--- DRAG
-local function onDragBegan(pos)
-	dragging = true
-	dragOffsetX = pos.X - root.AbsolutePosition.X
-	dragOffsetY = pos.Y - root.AbsolutePosition.Y
-end
-local function onDragMoved(pos)
-	if not dragging then return end
-	local x = pos.X - dragOffsetX
-	local y = pos.Y - dragOffsetY
-	root.Position = UDim2.new(0, x, 0, y)
-	shadow.Position = UDim2.new(0, x - 4, 0, y + 4)
-end
-local function onDragEnded()
-	dragging = false
-end
+-- DRAG (fixed: uses position delta only, never AbsolutePosition)
 local function wireDrag(h)
 	h.InputBegan:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then
-			onDragBegan(i.Position)
-		elseif i.UserInputType == Enum.UserInputType.Touch then
-			if not activeTouchId then
-				activeTouchId = i
-				onDragBegan(i.Position)
-			end
+		if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+			if dragging then return end
+			dragging = true
+			activeTouchId = i
+			local startX = root.Position.X.Offset
+			local startY = root.Position.Y.Offset
+			local startInputX = i.Position.X
+			local startInputY = i.Position.Y
+			local conn
+			conn = UIS.InputChanged:Connect(function(m)
+				if not dragging then conn:Disconnect() return end
+				if m.UserInputType ~= Enum.UserInputType.MouseMovement and m.UserInputType ~= Enum.UserInputType.Touch then return end
+				local nx = startX + (m.Position.X - startInputX)
+				local ny = startY + (m.Position.Y - startInputY)
+				root.Position = UDim2.new(0, nx, 0, ny)
+				shadow.Position = UDim2.new(0, nx - 4, 0, ny + 4)
+			end)
 		end
 	end)
 	h.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then
-			onDragEnded()
-		elseif i.UserInputType == Enum.UserInputType.Touch then
-			if i == activeTouchId then
-				activeTouchId = nil
-				onDragEnded()
-			end
+		if i == activeTouchId or i.UserInputType == Enum.UserInputType.MouseButton1 then
+			dragging = false
+			activeTouchId = nil
 		end
 	end)
 end
-UIS.InputChanged:Connect(function(i)
-	if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
-		onDragMoved(i.Position)
+
+UIS.InputEnded:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+		activeSlider = nil
+		activeTouchId = nil
 	end
+end)
+
+UIS.InputChanged:Connect(function(i)
 	if activeSlider and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
 		local s = activeSlider
 		local mx = i.Position.X - s.track.AbsolutePosition.X
@@ -102,12 +98,6 @@ UIS.InputChanged:Connect(function(i)
 		s.thumb.Position = UDim2.new(p, 0, 0.5, 0)
 		s.badge.Text = tostring(v)
 		if s.cb then s.cb(v) end
-	end
-end)
-UIS.InputEnded:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-		dragging = false
-		activeSlider = nil
 	end
 end)
 
@@ -128,7 +118,7 @@ task.spawn(function()
 	end
 end)
 
-local minBtn,closeBtn
+local minBtn, closeBtn
 
 -- FLOAT BUTTON
 local floatBtn = new("ImageButton",sg,{Name="FloatBtn",Size=UDim2.new(0,56,0,56),Position=UDim2.new(0,20,0.5,-28),BackgroundColor3=ct.acc1,BorderSizePixel=0,Image="rbxassetid://86879186972098",ImageColor3=Color3.new(1,1,1),ZIndex=20,Visible=false})
@@ -197,7 +187,6 @@ corner(main,14)
 local headerBar = new("Frame",main,{Size=UDim2.new(1,0,0,HH),BackgroundColor3=ct.bg0,BorderSizePixel=0})
 local headerDivLine = new("Frame",headerBar,{Size=UDim2.new(1,0,0,1),Position=UDim2.new(0,0,1,-1),BackgroundColor3=ct.text3,BorderSizePixel=0,BackgroundTransparency=0.5})
 local headerTitle = new("TextLabel",headerBar,{Size=UDim2.new(1,-70,1,0),Position=UDim2.new(0,16,0,0),BackgroundTransparency=1,Text="Settings",Font=Enum.Font.GothamBold,TextSize=mob and 12 or 14,TextColor3=ct.text0,TextXAlignment=Enum.TextXAlignment.Left})
-local headerSub = new("TextLabel",headerBar,{Size=UDim2.new(0,0,0,0),BackgroundTransparency=1,Text="",Font=Enum.Font.Gotham,TextSize=1,TextColor3=ct.text2})
 
 -- MIN/CLOSE in header
 minBtn = new("TextButton",headerBar,{Size=UDim2.new(0,22,0,22),Position=UDim2.new(1,-52,0.5,-11),BackgroundColor3=Color3.fromRGB(255,190,50),BorderSizePixel=0,Text="",ZIndex=10})
