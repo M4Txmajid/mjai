@@ -343,37 +343,28 @@ local function newI(cls,par,props) local o=Instance.new(cls); if par then o.Pare
 local function corner(o,r) Instance.new("UICorner",o).CornerRadius=UDim.new(0,r or 12) end
 local function pad(o,l,r,t,b) local p=Instance.new("UIPadding",o); p.PaddingLeft=UDim.new(0,l); p.PaddingRight=UDim.new(0,r or l); p.PaddingTop=UDim.new(0,t or l); p.PaddingBottom=UDim.new(0,b or t or l) end
 
--- safeTap: on mobile, only fires if finger didn't scroll (move < 12px).
--- On PC, just uses MouseButton1Click normally.
+-- safeTap: reliable mobile tap detection using UIS.InputEnded
 local function safeTap(btn, cb)
-	if mob then
-		btn.InputBegan:Connect(function(i)
-			if i.UserInputType ~= Enum.UserInputType.Touch then return end
-			local startX, startY = i.Position.X, i.Position.Y
-			local moved = false
-			local moveConn, endConn
-			moveConn = UIS.InputChanged:Connect(function(m)
-				if m.UserInputType ~= Enum.UserInputType.Touch then return end
-				if math.abs(m.Position.X-startX) > 12 or math.abs(m.Position.Y-startY) > 12 then
-					moved = true
-				end
-			end)
-			endConn = i.Changed:Connect(function()
-				if i.UserInputState == Enum.UserInputState.End then
-					moveConn:Disconnect(); endConn:Disconnect()
-					if not moved then
-						task.defer(cb)
-					end
-				end
-			end)
+	btn.MouseButton1Click:Connect(cb)
+	if not mob then return end
+	btn.InputBegan:Connect(function(i)
+		if i.UserInputType ~= Enum.UserInputType.Touch then return end
+		local startX, startY = i.Position.X, i.Position.Y
+		local moved = false
+		local mc = UIS.InputChanged:Connect(function(m)
+			if m.UserInputType ~= Enum.UserInputType.Touch then return end
+			if math.abs(m.Position.X - startX) > 20 or math.abs(m.Position.Y - startY) > 20 then
+				moved = true
+			end
 		end)
-	else
-		btn.MouseButton1Click:Connect(cb)
-	end
-	-- always wire mouse click too for PC
-	if mob then
-		btn.MouseButton1Click:Connect(cb)
-	end
+		local ec; ec = UIS.InputEnded:Connect(function(e)
+			if e.UserInputType ~= Enum.UserInputType.Touch then return end
+			mc:Disconnect(); ec:Disconnect()
+			if not moved then
+				task.defer(cb)
+			end
+		end)
+	end)
 end
 
 local sg = newI("ScreenGui",playerGui,{Name="CtrlUI",ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,IgnoreGuiInset=true})
