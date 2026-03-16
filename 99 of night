@@ -1,4 +1,4 @@
--- Muslimdevs | Hub v2.0 — Full Script
+-- Muslimdevs | Hub v2.0 — Full Script (FIXED dropdowns + all buttons for mobile)
 -- Game logic + Fixed GUI with do...end page blocks (fixes local register > 200)
 
 local Players           = game:GetService("Players")
@@ -249,7 +249,7 @@ task.spawn(function()
 	end
 end)
 
--- FLY (works on both PC and mobile via MoveDirection)
+-- FLY
 local flyEnabled=false
 local flyBody,flyGyro,flyConn=nil,nil,nil
 
@@ -349,6 +349,21 @@ local function newI(cls,par,props) local o=Instance.new(cls); if par then o.Pare
 local function corner(o,r) Instance.new("UICorner",o).CornerRadius=UDim.new(0,r or 12) end
 local function pad(o,l,r,t,b) local p=Instance.new("UIPadding",o); p.PaddingLeft=UDim.new(0,l); p.PaddingRight=UDim.new(0,r or l); p.PaddingTop=UDim.new(0,t or l); p.PaddingBottom=UDim.new(0,b or t or l) end
 
+-- ═══ DEBOUNCE HELPER (prevents double-fire on mobile) ═══
+local function connectBtn(btn, fn)
+	local debounce = false
+	local function wrapped()
+		if debounce then return end
+		debounce = true
+		fn()
+		task.defer(function() debounce = false end)
+	end
+	btn.MouseButton1Click:Connect(wrapped)
+	if btn.TouchTap then
+		btn.TouchTap:Connect(wrapped)
+	end
+end
+
 local sg=newI("ScreenGui",playerGui,{Name="CtrlUI",ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,IgnoreGuiInset=true})
 
 local function ShowNotif(title,msg,kind)
@@ -420,10 +435,16 @@ local minBtn=newI("TextButton",headerBar,{Size=UDim2.new(0,22,0,22),Position=UDi
 newI("TextLabel",minBtn,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="-",Font=Enum.Font.GothamBold,TextSize=15,TextColor3=Color3.fromRGB(120,80,0)})
 local closeBtn=newI("TextButton",headerBar,{Size=UDim2.new(0,22,0,22),Position=UDim2.new(1,-24,0.5,-11),BackgroundColor3=Color3.fromRGB(255,80,80),BorderSizePixel=0,Text="",ZIndex=10}); corner(closeBtn,11)
 newI("TextLabel",closeBtn,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="x",Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Color3.fromRGB(140,30,30)})
-minBtn.MouseButton1Click:Connect(minimize); minBtn.TouchTap:Connect(minimize)
-closeBtn.MouseButton1Click:Connect(function() tw(shadow,{BackgroundTransparency=1},0.18); tw(root,{Size=UDim2.new(0,0,0,0)},0.2); task.delay(0.22,function() sg:Destroy() end) end)
-closeBtn.TouchTap:Connect(function() tw(shadow,{BackgroundTransparency=1},0.18); tw(root,{Size=UDim2.new(0,0,0,0)},0.2); task.delay(0.22,function() sg:Destroy() end) end)
-floatBtn.MouseButton1Click:Connect(restore); floatBtn.TouchTap:Connect(restore)
+
+-- FIXED: use connectBtn for all header buttons
+connectBtn(minBtn, minimize)
+connectBtn(closeBtn, function()
+	tw(shadow,{BackgroundTransparency=1},0.18)
+	tw(root,{Size=UDim2.new(0,0,0,0)},0.2)
+	task.delay(0.22,function() sg:Destroy() end)
+end)
+connectBtn(floatBtn, restore)
+
 minBtn.MouseEnter:Connect(function() tw(minBtn,{BackgroundColor3=Color3.fromRGB(255,220,80)},0.1) end); minBtn.MouseLeave:Connect(function() tw(minBtn,{BackgroundColor3=Color3.fromRGB(255,190,50)},0.1) end)
 closeBtn.MouseEnter:Connect(function() tw(closeBtn,{BackgroundColor3=Color3.fromRGB(255,120,120)},0.1) end); closeBtn.MouseLeave:Connect(function() tw(closeBtn,{BackgroundColor3=Color3.fromRGB(255,80,80)},0.1) end)
 floatBtn.MouseEnter:Connect(function() tw(floatBtn,{Size=UDim2.new(0,62,0,62),Position=UDim2.new(0,17,0.5,-31)},0.12) end); floatBtn.MouseLeave:Connect(function() tw(floatBtn,{Size=UDim2.new(0,56,0,56),Position=UDim2.new(0,20,0.5,-28)},0.12) end)
@@ -431,14 +452,20 @@ wireDrag(headerBar); wireDrag(brandLbl)
 local pageScroll=newI("ScrollingFrame",main,{Size=UDim2.new(1,0,1,-HH),Position=UDim2.new(0,0,0,HH),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=mob and 2 or 3,ScrollBarImageColor3=ct.acc1,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true})
 pad(pageScroll,CPad,CPad,CPad,CPad)
 local pages={}; local activePageName=nil
+
 local function addPage(name,order)
 	local frame=newI("Frame",pageScroll,{Name=name,Size=UDim2.new(1,-CPad*2,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,BorderSizePixel=0,Visible=false})
 	newI("UIListLayout",frame,{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder})
 	local btn=newI("TextButton",navList,{Name=name.."Nav",Size=UDim2.new(1,0,0,34),BackgroundColor3=ct.bg1,BorderSizePixel=0,Text=name,Font=Enum.Font.GothamMedium,TextSize=mob and 10 or 12,TextColor3=ct.text2,TextXAlignment=Enum.TextXAlignment.Left,LayoutOrder=order,AutoButtonColor=false}); corner(btn,7); pad(btn,10)
 	pages[name]={frame=frame,btn=btn}
-	btn.MouseButton1Click:Connect(function() for _,pg in pairs(pages) do pg.frame.Visible=false; tw(pg.btn,{BackgroundColor3=ct.bg1,TextColor3=ct.text2},0.15) end; activePageName=name; frame.Visible=true; headerTitle.Text=name; tw(btn,{BackgroundColor3=ct.surface,TextColor3=ct.acc1},0.15) end)
-	btn.TouchTap:Connect(function() btn.MouseButton1Click:Fire() end); return frame
+	connectBtn(btn, function()
+		for _,pg in pairs(pages) do pg.frame.Visible=false; tw(pg.btn,{BackgroundColor3=ct.bg1,TextColor3=ct.text2},0.15) end
+		activePageName=name; frame.Visible=true; headerTitle.Text=name
+		tw(btn,{BackgroundColor3=ct.surface,TextColor3=ct.acc1},0.15)
+	end)
+	return frame
 end
+
 local function addSection(page,text,order) return newI("TextLabel",page,{Size=UDim2.new(1,0,0,16),BackgroundTransparency=1,Text=text:upper(),Font=Enum.Font.GothamBold,TextSize=9,TextColor3=ct.text3,TextXAlignment=Enum.TextXAlignment.Left,LayoutOrder=order or 0}) end
 local function addCard(page,order) local card=newI("Frame",page,{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundColor3=ct.surface,BorderSizePixel=0,LayoutOrder=order or 0}); corner(card,12); newI("UIStroke",card,{Color=ct.text3,Thickness=1,Transparency=0.5}); pad(card,CPad,CPad,10,10); newI("UIListLayout",card,{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder}); return card end
 
@@ -450,7 +477,7 @@ local function addToggle(card,labelText,descText,defaultOn,order,cb)
 	local pill=newI("Frame",row,{Name="Pill",Size=UDim2.new(0,pillW,0,pillH),Position=UDim2.new(1,-(pillW+6),0.5,-(pillH/2)),BackgroundColor3=defaultOn and ct.acc1 or ct.bg3,BorderSizePixel=0}); corner(pill,pillH/2)
 	local knob=newI("Frame",pill,{Size=UDim2.new(0,knobS,0,knobS),Position=defaultOn and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2)),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=3}); corner(knob,knobS/2)
 	local hitW=mob and 70 or pillW+10; local hitH=mob and (mob and 46 or 44) or pillH+10
-	local hit=newI("Frame",row,{Size=UDim2.new(0,hitW,0,hitH),Position=UDim2.new(1,-hitW-2,0.5,-(hitH/2)),BackgroundTransparency=1,ZIndex=5})
+	local hit=newI("TextButton",row,{Size=UDim2.new(0,hitW,0,hitH),Position=UDim2.new(1,-hitW-2,0.5,-(hitH/2)),BackgroundTransparency=1,Text="",ZIndex=5})
 	local state=defaultOn or false
 	local function toggle()
 		state=not state
@@ -458,14 +485,7 @@ local function addToggle(card,labelText,descText,defaultOn,order,cb)
 		tw(knob,{Position=state and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2))},0.18)
 		if cb then cb(state) end
 	end
-	-- FIXED: only one event type per platform, no double fire
-	hit.InputBegan:Connect(function(i)
-		if mob then
-			if i.UserInputType==Enum.UserInputType.Touch then toggle() end
-		else
-			if i.UserInputType==Enum.UserInputType.MouseButton1 then toggle() end
-		end
-	end)
+	connectBtn(hit, toggle)
 end
 
 local function addSlider(card,labelText,minV,maxV,defVal,order,cb)
@@ -483,34 +503,69 @@ end
 
 local function addButton(card,labelText,order,cb)
 	local btn=newI("TextButton",card,{Size=UDim2.new(1,0,0,mob and 38 or 32),BackgroundColor3=ct.bg3,BorderSizePixel=0,Text=labelText,Font=Enum.Font.GothamBold,TextSize=LS,TextColor3=ct.text0,LayoutOrder=order or 1,AutoButtonColor=false}); corner(btn,8)
-	btn.MouseButton1Click:Connect(function() if cb then cb() end end)
-	btn.TouchTap:Connect(function() if cb then cb() end end)
+	connectBtn(btn, function() if cb then cb() end end)
 	btn.MouseEnter:Connect(function() tw(btn,{BackgroundColor3=ct.acc1},0.12) end)
 	btn.MouseLeave:Connect(function() tw(btn,{BackgroundColor3=ct.bg3},0.12) end)
 	return btn
 end
 
 local function addDropdown(card,labelText,options,order,cb)
-	local itemH,maxH=mob and 36 or 30,mob and 220 or 200; local totalH=math.max(#options*itemH,1); local listH=math.min(totalH,maxH)
+	local itemH,maxH=mob and 36 or 30,mob and 220 or 200
+	local totalH=math.max(#options*itemH,1)
+	local listH=math.min(totalH,maxH)
+
 	local row=newI("Frame",card,{Size=UDim2.new(1,0,0,mob and 42 or 34),BackgroundTransparency=1,LayoutOrder=order or 1,ClipsDescendants=false})
 	newI("TextLabel",row,{Size=UDim2.new(0.40,0,1,0),BackgroundTransparency=1,Text=labelText,Font=Enum.Font.GothamMedium,TextSize=LS,TextColor3=ct.text1,TextXAlignment=Enum.TextXAlignment.Left})
+
 	local selH=mob and 34 or 28
-	local sel=newI("TextButton",row,{Size=UDim2.new(0.60,-4,0,selH),Position=UDim2.new(0.40,4,0.5,-(selH/2)),BackgroundColor3=ct.bg3,BorderSizePixel=0,Text="Select  ▾",Font=Enum.Font.Gotham,TextSize=LS,TextColor3=ct.text1,AutoButtonColor=false,ZIndex=5}); corner(sel,6); newI("UIStroke",sel,{Color=ct.text3,Thickness=1,Transparency=0.5})
+	local sel=newI("TextButton",row,{Size=UDim2.new(0.60,-4,0,selH),Position=UDim2.new(0.40,4,0.5,-(selH/2)),BackgroundColor3=ct.bg3,BorderSizePixel=0,Text="Select  ▾",Font=Enum.Font.Gotham,TextSize=LS,TextColor3=ct.text1,AutoButtonColor=false,ZIndex=5}); corner(sel,6)
+	newI("UIStroke",sel,{Color=ct.text3,Thickness=1,Transparency=0.5})
+
 	local lf=newI("ScrollingFrame",sg,{Size=UDim2.new(0,10,0,10),BackgroundColor3=ct.bg0,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=ct.acc1,CanvasSize=UDim2.new(0,0,0,totalH),Visible=false,ZIndex=200,ClipsDescendants=true}); corner(lf,6)
-	newI("UIStroke",lf,{Color=ct.acc1,Thickness=1.5,Transparency=0.3}); newI("UIPadding",lf,{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,4),PaddingLeft=UDim.new(0,4),PaddingRight=UDim.new(0,4)}); newI("UIListLayout",lf,{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder})
+	newI("UIStroke",lf,{Color=ct.acc1,Thickness=1.5,Transparency=0.3})
+	newI("UIPadding",lf,{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,4),PaddingLeft=UDim.new(0,4),PaddingRight=UDim.new(0,4)})
+	newI("UIListLayout",lf,{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder})
+
 	local blocker=newI("TextButton",sg,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=199,Visible=false,AutoButtonColor=false})
-	local function closeList() lf.Visible=false; blocker.Visible=false end
-	local function openList() local bp=sel.AbsolutePosition; local bs=sel.AbsoluteSize; lf.Size=UDim2.new(0,math.max(bs.X,mob and 200 or 160),0,listH); lf.Position=UDim2.new(0,bp.X,0,bp.Y+bs.Y+2); blocker.Visible=true; lf.Visible=true end
+
+	local isOpen=false
+
+	local function closeList()
+		isOpen=false
+		lf.Visible=false
+		blocker.Visible=false
+	end
+
+	local function openList()
+		local bp=sel.AbsolutePosition
+		local bs=sel.AbsoluteSize
+		lf.Size=UDim2.new(0,math.max(bs.X,mob and 200 or 160),0,listH)
+		lf.Position=UDim2.new(0,bp.X,0,bp.Y+bs.Y+2)
+		isOpen=true
+		blocker.Visible=true
+		lf.Visible=true
+	end
+
+	local function toggleList()
+		if isOpen then closeList() else openList() end
+	end
+
 	for i,opt in ipairs(options) do
 		local ob=newI("TextButton",lf,{Name="opt_"..i,Size=UDim2.new(1,0,0,itemH-2),BackgroundColor3=ct.bg2,BorderSizePixel=0,Text=opt,Font=Enum.Font.Gotham,TextSize=LS,TextColor3=ct.text0,AutoButtonColor=false,ZIndex=201}); corner(ob,5)
 		local cap=opt
-		ob.MouseButton1Click:Connect(function() sel.Text=cap.."  ▾"; sel.TextColor3=ct.acc1; closeList(); if cb then cb(cap) end end)
-		ob.TouchTap:Connect(function() sel.Text=cap.."  ▾"; sel.TextColor3=ct.acc1; closeList(); if cb then cb(cap) end end)
-		ob.MouseEnter:Connect(function() ob.BackgroundColor3=ct.surface end); ob.MouseLeave:Connect(function() ob.BackgroundColor3=ct.bg2 end)
+		connectBtn(ob, function()
+			sel.Text=cap.."  ▾"
+			sel.TextColor3=ct.acc1
+			closeList()
+			if cb then cb(cap) end
+		end)
+		ob.MouseEnter:Connect(function() ob.BackgroundColor3=ct.surface end)
+		ob.MouseLeave:Connect(function() ob.BackgroundColor3=ct.bg2 end)
 	end
-	blocker.MouseButton1Click:Connect(closeList); blocker.TouchTap:Connect(closeList)
-	sel.MouseButton1Click:Connect(function() if lf.Visible then closeList() else openList() end end)
-	sel.TouchTap:Connect(function() if lf.Visible then closeList() else openList() end end)
+
+	connectBtn(blocker, closeList)
+	connectBtn(sel, toggleList)
+
 	return sel
 end
 
@@ -690,10 +745,12 @@ do -- SETTINGS
 		if not mob then newI("TextLabel",card,{Size=UDim2.new(1,-90,0,13),Position=UDim2.new(0,18,0,26),BackgroundTransparency=1,Text=t.desc,Font=Enum.Font.Gotham,TextSize=10,TextColor3=t.text2,TextXAlignment=Enum.TextXAlignment.Left}) end
 		local applyBtn=newI("TextButton",card,{Size=UDim2.new(0,mob and 58 or 64,0,28),Position=UDim2.new(1,mob and -68 or -74,0.5,-14),BackgroundColor3=t.acc1,BackgroundTransparency=0.7,BorderSizePixel=0,Text="Apply",Font=Enum.Font.GothamBold,TextSize=mob and 11 or 11,TextColor3=t.acc1}); corner(applyBtn,7)
 		themeCardFrames[tname]={card=card,stroke=cs,btn=applyBtn}
-		local tn=tname; local function doApply() if applyTheme then applyTheme(T[tn]) end end
-		applyBtn.MouseButton1Click:Connect(doApply); applyBtn.TouchTap:Connect(doApply)
+		local tn=tname
+		local function doApply() if applyTheme then applyTheme(T[tn]) end end
+		connectBtn(applyBtn, doApply)
 		applyBtn.MouseEnter:Connect(function() tw(applyBtn,{BackgroundTransparency=0.4},0.1) end); applyBtn.MouseLeave:Connect(function() tw(applyBtn,{BackgroundTransparency=0.7},0.1) end)
-		local cb2=newI("TextButton",card,{Size=UDim2.new(1,-80,1,0),BackgroundTransparency=1,Text="",ZIndex=2}); cb2.MouseButton1Click:Connect(doApply); cb2.TouchTap:Connect(doApply)
+		local cb2=newI("TextButton",card,{Size=UDim2.new(1,-80,1,0),BackgroundTransparency=1,Text="",ZIndex=2})
+		connectBtn(cb2, doApply)
 	end
 	applyTheme=function(t)
 		ct=t; tw(root,{BackgroundColor3=t.bg1},0.22); tw(rootStroke,{Color=t.acc1},0.22)
@@ -711,7 +768,11 @@ end
 task.defer(function()
 	local s=sg.AbsoluteSize; local cx,cy=math.floor(s.X/2-GW/2),math.floor(s.Y/2-GH/2)
 	root.Position=UDim2.new(0,cx,0,cy); shadow.Position=UDim2.new(0,cx-8,0,cy+4)
-	if pages["Hub"] then pages["Hub"].btn.MouseButton1Click:Fire() end
+	if pages["Hub"] then
+		for _,pg in pairs(pages) do pg.frame.Visible=false; tw(pg.btn,{BackgroundColor3=ct.bg1,TextColor3=ct.text2},0.15) end
+		activePageName="Hub"; pages["Hub"].frame.Visible=true; headerTitle.Text="Hub"
+		tw(pages["Hub"].btn,{BackgroundColor3=ct.surface,TextColor3=ct.acc1},0.15)
+	end
 end)
 
 print("[ModernHub v2.0] Loaded! Mobile:",mob)
