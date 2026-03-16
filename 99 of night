@@ -314,7 +314,7 @@ task.wait(0.1)
 local mob = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
 -- SIZE — matches standalone file
-local GW  = mob and 500 or 720
+local GW  = mob and 445 or 720
 local GH  = mob and 360 or 490
 local SW  = mob and 150 or 180
 local CPad = mob and 10 or 14
@@ -351,16 +351,16 @@ local function safeTap(btn, cb)
 			if i.UserInputType ~= Enum.UserInputType.Touch then return end
 			local startX, startY = i.Position.X, i.Position.Y
 			local moved = false
-			local moveConn, endConn
+			local moveConn
 			moveConn = UIS.InputChanged:Connect(function(m)
 				if m.UserInputType ~= Enum.UserInputType.Touch then return end
-				if math.abs(m.Position.X-startX) > 12 or math.abs(m.Position.Y-startY) > 12 then
+				if math.abs(m.Position.X-startX) > 20 or math.abs(m.Position.Y-startY) > 20 then
 					moved = true
 				end
 			end)
-			endConn = i.Changed:Connect(function()
+			i.Changed:Connect(function()
 				if i.UserInputState == Enum.UserInputState.End then
-					moveConn:Disconnect(); endConn:Disconnect()
+					moveConn:Disconnect()
 					if not moved then
 						task.defer(cb)
 					end
