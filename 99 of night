@@ -1,5 +1,4 @@
--- Muslimdevs | Hub v2.0 — Full Script (FIXED toggles + dropdowns for mobile & PC)
--- Game logic + Fixed GUI with do...end page blocks (fixes local register > 200)
+-- Muslimdevs | Hub v2.0 — Full Script (FINAL FIX — Activated-based, no double-fire)
 
 local Players           = game:GetService("Players")
 local UserInputService  = game:GetService("UserInputService")
@@ -249,7 +248,6 @@ task.spawn(function()
 	end
 end)
 
--- FLY
 local flyEnabled=false
 local flyBody,flyGyro,flyConn=nil,nil,nil
 
@@ -349,27 +347,23 @@ local function newI(cls,par,props) local o=Instance.new(cls); if par then o.Pare
 local function corner(o,r) Instance.new("UICorner",o).CornerRadius=UDim.new(0,r or 12) end
 local function pad(o,l,r,t,b) local p=Instance.new("UIPadding",o); p.PaddingLeft=UDim.new(0,l); p.PaddingRight=UDim.new(0,r or l); p.PaddingTop=UDim.new(0,t or l); p.PaddingBottom=UDim.new(0,b or t or l) end
 
--- ═══════════════════════════════════════════════════
--- UNIVERSAL TAP HELPER — prevents double-fire on mobile
--- On mobile a single tap fires BOTH MouseButton1Click AND TouchTap/InputBegan(Touch)
--- This helper uses tick()-based debounce so only the first one runs
--- ═══════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════════
+-- safeTap — THE FIX
+-- Uses .Activated which fires EXACTLY ONCE per tap/click
+-- on ALL platforms (mouse, touch, gamepad).
+-- No double-fire possible. Tick debounce as extra safety.
+-- ═══════════════════════════════════════════════════════════
 local function safeTap(guiObject, callback)
 	local lastFire = 0
-	local COOLDOWN = 0.15
-
 	local function tryFire()
 		local now = tick()
-		if now - lastFire < COOLDOWN then return end
+		if now - lastFire < 0.2 then return end
 		lastFire = now
 		callback()
 	end
 
-	if guiObject:IsA("TextButton") or guiObject:IsA("ImageButton") then
-		guiObject.MouseButton1Click:Connect(tryFire)
-		if guiObject.TouchTap then
-			guiObject.TouchTap:Connect(tryFire)
-		end
+	if guiObject:IsA("GuiButton") then
+		guiObject.Activated:Connect(tryFire)
 	else
 		guiObject.InputBegan:Connect(function(input)
 			if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -468,7 +462,6 @@ local pageScroll=newI("ScrollingFrame",main,{Size=UDim2.new(1,0,1,-HH),Position=
 pad(pageScroll,CPad,CPad,CPad,CPad)
 local pages={}; local activePageName=nil
 
--- ═══ selectPage: direct function, no :Fire() ═══
 local function selectPage(name)
 	for _,pg in pairs(pages) do
 		pg.frame.Visible=false
@@ -495,89 +488,57 @@ local function addSection(page,text,order) return newI("TextLabel",page,{Size=UD
 local function addCard(page,order) local card=newI("Frame",page,{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundColor3=ct.surface,BorderSizePixel=0,LayoutOrder=order or 0}); corner(card,12); newI("UIStroke",card,{Color=ct.text3,Thickness=1,Transparency=0.5}); pad(card,CPad,CPad,10,10); newI("UIListLayout",card,{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder}); return card end
 
 -- ═══════════════════════════════════════════════════
--- REWRITTEN addToggle — uses TextButton + safeTap
+-- TOGGLE — TextButton hit area + safeTap
 -- ═══════════════════════════════════════════════════
 local function addToggle(card, labelText, descText, defaultOn, order, cb)
 	local row = newI("Frame", card, {
 		Size = UDim2.new(1, 0, 0, mob and 46 or 44),
-		BackgroundTransparency = 1,
-		LayoutOrder = order or 1
+		BackgroundTransparency = 1, LayoutOrder = order or 1
 	})
-
 	newI("TextLabel", row, {
-		Size = UDim2.new(1, -60, 0, 18),
-		Position = UDim2.new(0, 0, 0, 4),
-		BackgroundTransparency = 1,
-		Text = labelText,
-		Font = Enum.Font.GothamMedium,
-		TextSize = LS,
-		TextColor3 = ct.text1,
-		TextXAlignment = Enum.TextXAlignment.Left
+		Size = UDim2.new(1, -60, 0, 18), Position = UDim2.new(0, 0, 0, 4),
+		BackgroundTransparency = 1, Text = labelText,
+		Font = Enum.Font.GothamMedium, TextSize = LS,
+		TextColor3 = ct.text1, TextXAlignment = Enum.TextXAlignment.Left
 	})
-
 	if descText and not mob then
 		newI("TextLabel", row, {
-			Size = UDim2.new(1, -60, 0, 14),
-			Position = UDim2.new(0, 0, 0, 22),
-			BackgroundTransparency = 1,
-			Text = descText,
-			Font = Enum.Font.Code,
-			TextSize = 10,
-			TextColor3 = ct.text3,
-			TextXAlignment = Enum.TextXAlignment.Left
+			Size = UDim2.new(1, -60, 0, 14), Position = UDim2.new(0, 0, 0, 22),
+			BackgroundTransparency = 1, Text = descText,
+			Font = Enum.Font.Code, TextSize = 10,
+			TextColor3 = ct.text3, TextXAlignment = Enum.TextXAlignment.Left
 		})
 	end
-
 	local pillW = mob and 46 or 36
 	local pillH = mob and 26 or 20
 	local knobS = mob and 20 or 14
-
 	local pill = newI("Frame", row, {
-		Name = "Pill",
-		Size = UDim2.new(0, pillW, 0, pillH),
+		Name = "Pill", Size = UDim2.new(0, pillW, 0, pillH),
 		Position = UDim2.new(1, -(pillW + 6), 0.5, -(pillH / 2)),
-		BackgroundColor3 = defaultOn and ct.acc1 or ct.bg3,
-		BorderSizePixel = 0
-	})
-	corner(pill, pillH / 2)
-
+		BackgroundColor3 = defaultOn and ct.acc1 or ct.bg3, BorderSizePixel = 0
+	}); corner(pill, pillH / 2)
 	local knob = newI("Frame", pill, {
 		Size = UDim2.new(0, knobS, 0, knobS),
-		Position = defaultOn
-			and UDim2.new(1, -(knobS + 3), 0.5, -(knobS / 2))
-			or UDim2.new(0, 3, 0.5, -(knobS / 2)),
-		BackgroundColor3 = Color3.new(1, 1, 1),
-		BorderSizePixel = 0,
-		ZIndex = 3
-	})
-	corner(knob, knobS / 2)
+		Position = defaultOn and UDim2.new(1, -(knobS + 3), 0.5, -(knobS / 2)) or UDim2.new(0, 3, 0.5, -(knobS / 2)),
+		BackgroundColor3 = Color3.new(1, 1, 1), BorderSizePixel = 0, ZIndex = 3
+	}); corner(knob, knobS / 2)
 
-	-- Invisible TextButton covering the toggle area for reliable tap
 	local hitBtn = newI("TextButton", row, {
 		Size = UDim2.new(0, mob and 80 or (pillW + 16), 0, mob and 46 or 44),
 		Position = UDim2.new(1, -(mob and 82 or (pillW + 18)), 0, 0),
-		BackgroundTransparency = 1,
-		Text = "",
-		ZIndex = 5,
-		AutoButtonColor = false
+		BackgroundTransparency = 1, Text = "", ZIndex = 5, AutoButtonColor = false
 	})
-
 	local state = defaultOn or false
-
 	safeTap(hitBtn, function()
 		state = not state
 		tw(pill, {BackgroundColor3 = state and ct.acc1 or ct.bg3}, 0.18)
-		tw(knob, {
-			Position = state
-				and UDim2.new(1, -(knobS + 3), 0.5, -(knobS / 2))
-				or UDim2.new(0, 3, 0.5, -(knobS / 2))
-		}, 0.18)
+		tw(knob, {Position = state and UDim2.new(1, -(knobS + 3), 0.5, -(knobS / 2)) or UDim2.new(0, 3, 0.5, -(knobS / 2))}, 0.18)
 		if cb then cb(state) end
 	end)
 end
 
 -- ═══════════════════════════════════════════════════
--- addSlider — unchanged (already works fine)
+-- SLIDER — unchanged
 -- ═══════════════════════════════════════════════════
 local function addSlider(card,labelText,minV,maxV,defVal,order,cb)
 	local row=newI("Frame",card,{Size=UDim2.new(1,0,0,38),BackgroundTransparency=1,LayoutOrder=order or 1})
@@ -593,30 +554,28 @@ local function addSlider(card,labelText,minV,maxV,defVal,order,cb)
 end
 
 -- ═══════════════════════════════════════════════════
--- REWRITTEN addButton — uses safeTap
+-- BUTTON — safeTap
 -- ═══════════════════════════════════════════════════
 local function addButton(card, labelText, order, cb)
 	local btn = newI("TextButton", card, {
 		Size = UDim2.new(1, 0, 0, mob and 38 or 32),
-		BackgroundColor3 = ct.bg3,
-		BorderSizePixel = 0,
-		Text = labelText,
-		Font = Enum.Font.GothamBold,
-		TextSize = LS,
-		TextColor3 = ct.text0,
-		LayoutOrder = order or 1,
-		AutoButtonColor = false
-	})
-	corner(btn, 8)
+		BackgroundColor3 = ct.bg3, BorderSizePixel = 0,
+		Text = labelText, Font = Enum.Font.GothamBold,
+		TextSize = LS, TextColor3 = ct.text0,
+		LayoutOrder = order or 1, AutoButtonColor = false
+	}); corner(btn, 8)
 	safeTap(btn, function() if cb then cb() end end)
 	btn.MouseEnter:Connect(function() tw(btn, {BackgroundColor3 = ct.acc1}, 0.12) end)
 	btn.MouseLeave:Connect(function() tw(btn, {BackgroundColor3 = ct.bg3}, 0.12) end)
 	return btn
 end
 
--- ═══════════════════════════════════════════════════
--- REWRITTEN addDropdown — uses safeTap + isOpen bool
--- ═══════════════════════════════════════════════════
+-- ═══════════════════════════════════════════════════════════
+-- DROPDOWN — COMPLETELY REWRITTEN
+-- Uses safeTap (.Activated) for all buttons
+-- Uses isOpen boolean for state tracking
+-- Uses blockerReady delay to prevent same-tap close
+-- ═══════════════════════════════════════════════════════════
 local function addDropdown(card, labelText, options, order, cb)
 	local itemH = mob and 36 or 30
 	local maxH = mob and 220 or 200
@@ -625,17 +584,13 @@ local function addDropdown(card, labelText, options, order, cb)
 
 	local row = newI("Frame", card, {
 		Size = UDim2.new(1, 0, 0, mob and 42 or 34),
-		BackgroundTransparency = 1,
-		LayoutOrder = order or 1,
+		BackgroundTransparency = 1, LayoutOrder = order or 1,
 		ClipsDescendants = false
 	})
 	newI("TextLabel", row, {
-		Size = UDim2.new(0.40, 0, 1, 0),
-		BackgroundTransparency = 1,
-		Text = labelText,
-		Font = Enum.Font.GothamMedium,
-		TextSize = LS,
-		TextColor3 = ct.text1,
+		Size = UDim2.new(0.40, 0, 1, 0), BackgroundTransparency = 1,
+		Text = labelText, Font = Enum.Font.GothamMedium,
+		TextSize = LS, TextColor3 = ct.text1,
 		TextXAlignment = Enum.TextXAlignment.Left
 	})
 
@@ -643,70 +598,71 @@ local function addDropdown(card, labelText, options, order, cb)
 	local sel = newI("TextButton", row, {
 		Size = UDim2.new(0.60, -4, 0, selH),
 		Position = UDim2.new(0.40, 4, 0.5, -(selH / 2)),
-		BackgroundColor3 = ct.bg3,
-		BorderSizePixel = 0,
-		Text = "Select  ▾",
-		Font = Enum.Font.Gotham,
-		TextSize = LS,
-		TextColor3 = ct.text1,
-		AutoButtonColor = false,
-		ZIndex = 5
+		BackgroundColor3 = ct.bg3, BorderSizePixel = 0,
+		Text = "Select  ▾", Font = Enum.Font.Gotham,
+		TextSize = LS, TextColor3 = ct.text1,
+		AutoButtonColor = false, ZIndex = 5
 	})
 	corner(sel, 6)
 	newI("UIStroke", sel, {Color = ct.text3, Thickness = 1, Transparency = 0.5})
 
+	-- Dropdown list (parented to ScreenGui so it floats above everything)
 	local lf = newI("ScrollingFrame", sg, {
 		Size = UDim2.new(0, 10, 0, 10),
-		BackgroundColor3 = ct.bg0,
-		BorderSizePixel = 0,
-		ScrollBarThickness = 3,
-		ScrollBarImageColor3 = ct.acc1,
+		BackgroundColor3 = ct.bg0, BorderSizePixel = 0,
+		ScrollBarThickness = 3, ScrollBarImageColor3 = ct.acc1,
 		CanvasSize = UDim2.new(0, 0, 0, totalH),
-		Visible = false,
-		ZIndex = 200,
-		ClipsDescendants = true
+		Visible = false, ZIndex = 200, ClipsDescendants = true
 	})
 	corner(lf, 6)
 	newI("UIStroke", lf, {Color = ct.acc1, Thickness = 1.5, Transparency = 0.3})
 	newI("UIPadding", lf, {
-		PaddingTop = UDim.new(0, 4),
-		PaddingBottom = UDim.new(0, 4),
-		PaddingLeft = UDim.new(0, 4),
-		PaddingRight = UDim.new(0, 4)
+		PaddingTop = UDim.new(0, 4), PaddingBottom = UDim.new(0, 4),
+		PaddingLeft = UDim.new(0, 4), PaddingRight = UDim.new(0, 4)
 	})
 	newI("UIListLayout", lf, {Padding = UDim.new(0, 2), SortOrder = Enum.SortOrder.LayoutOrder})
 
-	-- Full-screen invisible blocker to close dropdown when tapping outside
+	-- Full-screen blocker to close dropdown when tapping outside
 	local blocker = newI("TextButton", sg, {
 		Size = UDim2.new(1, 0, 1, 0),
-		BackgroundTransparency = 1,
-		Text = "",
-		ZIndex = 199,
-		Visible = false,
-		AutoButtonColor = false
+		BackgroundTransparency = 1, Text = "",
+		ZIndex = 199, Visible = false, AutoButtonColor = false
 	})
 
+	-- State
 	local isOpen = false
+	local blockerReady = false
 
 	local function closeList()
 		if not isOpen then return end
 		isOpen = false
+		blockerReady = false
 		lf.Visible = false
 		blocker.Visible = false
 	end
 
 	local function openList()
 		if isOpen then return end
+		-- Position dropdown below the selector button
 		local bp = sel.AbsolutePosition
 		local bs = sel.AbsoluteSize
 		lf.Size = UDim2.new(0, math.max(bs.X, mob and 200 or 160), 0, listH)
 		lf.Position = UDim2.new(0, bp.X, 0, bp.Y + bs.Y + 2)
+
 		isOpen = true
+		blockerReady = false -- NOT ready to close yet
 		blocker.Visible = true
 		lf.Visible = true
+
+		-- Allow blocker to close after delay (prevents same-tap close)
+		task.delay(0.3, function()
+			if isOpen then
+				blockerReady = true
+			end
+		end)
 	end
 
-	-- Toggle button: open/close the list
+	-- Selector button: toggle open/close
 	safeTap(sel, function()
 		if isOpen then
 			closeList()
@@ -715,9 +671,11 @@ local function addDropdown(card, labelText, options, order, cb)
 		end
 	end)
 
-	-- Blocker: close on tap outside
+	-- Blocker: close only if ready (not from same tap that opened)
 	safeTap(blocker, function()
-		closeList()
+		if blockerReady then
+			closeList()
+		end
 	end)
 
 	-- Option buttons
@@ -725,14 +683,10 @@ local function addDropdown(card, labelText, options, order, cb)
 		local ob = newI("TextButton", lf, {
 			Name = "opt_" .. i,
 			Size = UDim2.new(1, 0, 0, itemH - 2),
-			BackgroundColor3 = ct.bg2,
-			BorderSizePixel = 0,
-			Text = opt,
-			Font = Enum.Font.Gotham,
-			TextSize = LS,
-			TextColor3 = ct.text0,
-			AutoButtonColor = false,
-			ZIndex = 201
+			BackgroundColor3 = ct.bg2, BorderSizePixel = 0,
+			Text = opt, Font = Enum.Font.Gotham,
+			TextSize = LS, TextColor3 = ct.text0,
+			AutoButtonColor = false, ZIndex = 201
 		})
 		corner(ob, 5)
 
@@ -947,7 +901,6 @@ do -- SETTINGS
 	local mc=themeCardFrames["Midnight"]; if mc then mc.stroke.Color=ct.acc1; mc.stroke.Transparency=0; mc.stroke.Thickness=1.5 end
 end
 
--- ═══ Initial page selection (direct call, no :Fire()) ═══
 task.defer(function()
 	local s=sg.AbsoluteSize; local cx,cy=math.floor(s.X/2-GW/2),math.floor(s.Y/2-GH/2)
 	root.Position=UDim2.new(0,cx,0,cy); shadow.Position=UDim2.new(0,cx-8,0,cy+4)
