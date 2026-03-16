@@ -250,34 +250,6 @@ end)
 
 local flyEnabled,flyBody,flyGyro,flyConn=false,nil,nil,nil
 
-local function getMobileThumbstick()
-	local ts = Vector2.new(0,0)
-	pcall(function()
-		local pg = Player.PlayerGui
-		for _,gui in pairs(pg:GetChildren()) do
-			local frame = gui:FindFirstChild("TouchControlFrame")
-			if frame then
-				for _,child in pairs(frame:GetDescendants()) do
-					if child:IsA("ImageLabel") and child.Name == "MovingThumbstick" then
-						local stick = child.Parent
-						local center = stick.AbsolutePosition + stick.AbsoluteSize/2
-						local pos = child.AbsolutePosition + child.AbsoluteSize/2
-						local delta = pos - center
-						local maxDist = stick.AbsoluteSize.X / 2
-						if maxDist > 0 then
-							ts = Vector2.new(
-								math.clamp(delta.X / maxDist, -1, 1),
-								math.clamp(-delta.Y / maxDist, -1, 1)
-							)
-						end
-					end
-				end
-			end
-		end
-	end)
-	return ts
-end
-
 local function stopFly()
 	flyEnabled = false
 	if flyConn then flyConn:Disconnect(); flyConn=nil end
@@ -298,14 +270,7 @@ local function startFly()
 	local char = Player.Character
 	if not char or not HRP then return end
 	local hum = char:FindFirstChildOfClass("Humanoid")
-
-	if mob then
-		-- on mobile do NOT use PlatformStand — it kills the joystick
-		-- use BodyVelocity only, keep humanoid state normal
-		if hum then hum:ChangeState(Enum.HumanoidStateType.Physics) end
-	else
-		if hum then hum.PlatformStand = true end
-	end
+	if hum then hum.PlatformStand = true end
 
 	flyBody = Instance.new("BodyVelocity")
 	flyBody.Velocity = Vector3.zero
@@ -324,10 +289,16 @@ local function startFly()
 		local cf = workspace.CurrentCamera.CFrame
 		local md = Vector3.zero
 		if mob then
-			local stick = getMobileThumbstick()
-			if math.abs(stick.X) > 0.08 or math.abs(stick.Y) > 0.08 then
-				md = md + cf.LookVector * stick.Y
-				md = md + cf.RightVector * stick.X
+			-- MoveDirection is set by Roblox joystick automatically on mobile
+			local hum2 = char and char:FindFirstChildOfClass("Humanoid")
+			local moveDir = hum2 and hum2.MoveDirection or Vector3.zero
+			if moveDir.Magnitude > 0.01 then
+				-- translate ground move direction into camera-relative fly direction
+				local camFlat = Vector3.new(cf.LookVector.X, 0, cf.LookVector.Z).Unit
+				local right = Vector3.new(cf.RightVector.X, 0, cf.RightVector.Z).Unit
+				local dot_fwd = moveDir:Dot(camFlat)
+				local dot_right = moveDir:Dot(right)
+				md = cf.LookVector * dot_fwd + cf.RightVector * dot_right
 			end
 		else
 			if UserInputService:IsKeyDown(Enum.KeyCode.W) then md=md+cf.LookVector end
