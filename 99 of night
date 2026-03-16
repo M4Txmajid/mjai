@@ -439,7 +439,7 @@ local function minimize() tw(root,{Size=UDim2.new(0,0,0,0),Position=UDim2.new(0,
 local function restore() floatBtn.Visible=false; shadow.Visible=true; shadow.BackgroundTransparency=1; root.Visible=true; root.Size=UDim2.new(0,0,0,0); local s=sg.AbsoluteSize; local cx,cy=math.floor(s.X/2-GW/2),math.floor(s.Y/2-GH/2); root.Position=UDim2.new(0,cx+GW/2,0,cy+GH/2); shadow.Position=UDim2.new(0,cx+GW/2-4,0,cy+GH/2+4); tw(root,{Size=UDim2.new(0,GW,0,GH),Position=UDim2.new(0,cx,0,cy)},0.28); tw(shadow,{Size=UDim2.new(0,SSW,0,SSH),Position=UDim2.new(0,cx-8,0,cy+4),BackgroundTransparency=0.8},0.28) end
 
 newI("Frame",sidebar,{Size=UDim2.new(1,0,0,1),Position=UDim2.new(0,0,0,44),BackgroundColor3=ct.text3,BorderSizePixel=0,BackgroundTransparency=0.5})
-local navList=newI("ScrollingFrame",sidebar,{Size=UDim2.new(1,0,1,-120),Position=UDim2.new(0,0,0,52),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=0,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true,ElasticBehavior=Enum.ElasticBehavior.Never})
+local navList=newI("ScrollingFrame",sidebar,{Size=UDim2.new(1,0,1,-120),Position=UDim2.new(0,0,0,52),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=0,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true})
 newI("UIListLayout",navList,{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder}); pad(navList,4,4,4,4)
 
 local playerCard=newI("Frame",sidebar,{Size=UDim2.new(1,-8,0,52),Position=UDim2.new(0,4,1,-58),BackgroundColor3=ct.surface,BorderSizePixel=0}); corner(playerCard,10)
@@ -468,7 +468,7 @@ minBtn.MouseEnter:Connect(function() tw(minBtn,{BackgroundColor3=Color3.fromRGB(
 closeBtn.MouseEnter:Connect(function() tw(closeBtn,{BackgroundColor3=Color3.fromRGB(255,120,120)},0.1) end); closeBtn.MouseLeave:Connect(function() tw(closeBtn,{BackgroundColor3=Color3.fromRGB(255,80,80)},0.1) end)
 wireDrag(headerBar); wireDrag(brandLbl)
 
-local pageScroll=newI("ScrollingFrame",main,{Size=UDim2.new(1,0,1,-HH),Position=UDim2.new(0,0,0,HH),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=mob and 2 or 3,ScrollBarImageColor3=ct.acc1,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true,ScrollingEnabled=true,ElasticBehavior=Enum.ElasticBehavior.Never})
+local pageScroll=newI("ScrollingFrame",main,{Size=UDim2.new(1,0,1,-HH),Position=UDim2.new(0,0,0,HH),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=mob and 2 or 3,ScrollBarImageColor3=ct.acc1,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true})
 pad(pageScroll,CPad,CPad,CPad,CPad)
 
 local pages={}; local activePageName=nil
@@ -511,13 +511,17 @@ local function addToggle(card,labelText,descText,defaultOn,order,cb)
 	local state=defaultOn or false
 	local function toggle()
 		state=not state
-		tw(pill,{BackgroundColor3=state and ct.acc1 or ct.bg3},0.18)
-		tw(knob,{Position=state and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2))},0.18)
+		-- instant color change, no tween on mobile
+		if mob then
+			pill.BackgroundColor3 = state and ct.acc1 or ct.bg3
+			knob.Position = state and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2))
+		else
+			tw(pill,{BackgroundColor3=state and ct.acc1 or ct.bg3},0.18)
+			tw(knob,{Position=state and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2))},0.18)
+		end
 		if cb then cb(state) end
 	end
-	-- PC
 	hit.MouseButton1Click:Connect(toggle)
-	-- Mobile: fire on InputBegan (finger down) — most reliable on Roblox mobile
 	hit.InputBegan:Connect(function(i)
 		if i.UserInputType == Enum.UserInputType.Touch then
 			toggle()
