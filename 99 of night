@@ -314,9 +314,9 @@ task.wait(0.1)
 local mob = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
 -- SIZE — matches standalone file
-local GW  = mob and 600 or 820
+local GW  = mob and 445 or 720
 local GH  = mob and 360 or 490
-local SW  = mob and 170 or 200
+local SW  = mob and 150 or 180
 local CPad = mob and 10 or 14
 local LS  = mob and 11 or 13
 local HH  = mob and 40 or 44
@@ -494,7 +494,7 @@ local function addCard(page,order)
 	newI("UIListLayout",card,{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder}); return card
 end
 
--- TOGGLE — bigger pill + larger invisible hit area on mobile
+-- TOGGLE
 local function addToggle(card,labelText,descText,defaultOn,order,cb)
 	local rowH = mob and 46 or 44
 	local row=newI("Frame",card,{Size=UDim2.new(1,0,0,rowH),BackgroundTransparency=1,LayoutOrder=order or 1})
@@ -505,7 +505,6 @@ local function addToggle(card,labelText,descText,defaultOn,order,cb)
 	local knobS = mob and 20 or 14
 	local pill=newI("Frame",row,{Name="Pill",Size=UDim2.new(0,pillW,0,pillH),Position=UDim2.new(1,-(pillW+6),0.5,-(pillH/2)),BackgroundColor3=defaultOn and ct.acc1 or ct.bg3,BorderSizePixel=0}); corner(pill,pillH/2)
 	local knob=newI("Frame",pill,{Size=UDim2.new(0,knobS,0,knobS),Position=defaultOn and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2)),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=3}); corner(knob,knobS/2)
-	-- large invisible hit zone so finger doesn't have to be precise
 	local hitW = mob and 70 or pillW+10
 	local hitH = mob and rowH or pillH+10
 	local hit=newI("TextButton",row,{Size=UDim2.new(0,hitW,0,hitH),Position=UDim2.new(1,-hitW-2,0.5,-(hitH/2)),BackgroundTransparency=1,Text="",ZIndex=5})
@@ -516,7 +515,14 @@ local function addToggle(card,labelText,descText,defaultOn,order,cb)
 		tw(knob,{Position=state and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2))},0.18)
 		if cb then cb(state) end
 	end
-	safeTap(hit, toggle)
+	-- PC
+	hit.MouseButton1Click:Connect(toggle)
+	-- Mobile: fire on InputBegan (finger down) — most reliable on Roblox mobile
+	hit.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.Touch then
+			toggle()
+		end
+	end)
 end
 
 -- SLIDER
