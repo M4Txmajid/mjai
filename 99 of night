@@ -312,7 +312,7 @@ for _,v in pairs(playerGui:GetChildren()) do if v.Name=="CtrlUI" then v:Destroy(
 task.wait(0.1)
 
 local mob=UIS.TouchEnabled and not UIS.KeyboardEnabled
-local GW=mob and 445 or 720; local GH=mob and 360 or 490; local SW=mob and 130 or 160
+local GW=mob and 445 or 720; local GH=mob and 360 or 490; local SW=mob and 150 or 180
 local CPad=mob and 10 or 14; local LS=mob and 11 or 13; local HH=mob and 40 or 44; local TCH=mob and 48 or 62
 
 local T={
