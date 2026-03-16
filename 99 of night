@@ -257,12 +257,11 @@ local function getMobileThumbstick()
 		for _,gui in pairs(pg:GetChildren()) do
 			local frame = gui:FindFirstChild("TouchControlFrame")
 			if frame then
-				local stick = frame:FindFirstChild("DynamicThumbstickFrame") or frame:FindFirstChild("ThumbstickFrame")
-				if stick then
-					local inner = stick:FindFirstChild("MovingThumbstick") or stick:FindFirstChild("InnerThumbstick")
-					if inner then
+				for _,child in pairs(frame:GetDescendants()) do
+					if child:IsA("ImageLabel") and child.Name == "MovingThumbstick" then
+						local stick = child.Parent
 						local center = stick.AbsolutePosition + stick.AbsoluteSize/2
-						local pos = inner.AbsolutePosition + inner.AbsoluteSize/2
+						local pos = child.AbsolutePosition + child.AbsoluteSize/2
 						local delta = pos - center
 						local maxDist = stick.AbsoluteSize.X / 2
 						if maxDist > 0 then
@@ -280,28 +279,56 @@ local function getMobileThumbstick()
 end
 
 local function stopFly()
-	flyEnabled=false
+	flyEnabled = false
 	if flyConn then flyConn:Disconnect(); flyConn=nil end
 	if flyBody then flyBody:Destroy(); flyBody=nil end
 	if flyGyro then flyGyro:Destroy(); flyGyro=nil end
-	local char=Player.Character; if char then local hum=char:FindFirstChildOfClass("Humanoid"); if hum then hum.PlatformStand=false end end
+	local char = Player.Character
+	if char then
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum.PlatformStand = false
+			hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+		end
+	end
 end
 
 local function startFly()
-	flyEnabled=true; local char=Player.Character; if not char or not HRP then return end
-	local hum=char:FindFirstChildOfClass("Humanoid"); if hum then hum.PlatformStand=true end
-	flyBody=Instance.new("BodyVelocity"); flyBody.Velocity=Vector3.zero; flyBody.MaxForce=Vector3.new(1e5,1e5,1e5); flyBody.Parent=HRP
-	flyGyro=Instance.new("BodyGyro"); flyGyro.MaxTorque=Vector3.new(1e5,1e5,1e5); flyGyro.P=1e4; flyGyro.CFrame=HRP.CFrame; flyGyro.Parent=HRP
-	flyConn=RunService.Heartbeat:Connect(function()
+	flyEnabled = true
+	local char = Player.Character
+	if not char or not HRP then return end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+
+	if mob then
+		-- on mobile do NOT use PlatformStand — it kills the joystick
+		-- use BodyVelocity only, keep humanoid state normal
+		if hum then hum:ChangeState(Enum.HumanoidStateType.Physics) end
+	else
+		if hum then hum.PlatformStand = true end
+	end
+
+	flyBody = Instance.new("BodyVelocity")
+	flyBody.Velocity = Vector3.zero
+	flyBody.MaxForce = Vector3.new(1e5,1e5,1e5)
+	flyBody.Parent = HRP
+
+	flyGyro = Instance.new("BodyGyro")
+	flyGyro.MaxTorque = Vector3.new(1e5,1e5,1e5)
+	flyGyro.P = 1e4
+	flyGyro.CFrame = HRP.CFrame
+	flyGyro.Parent = HRP
+
+	flyConn = RunService.Heartbeat:Connect(function()
 		if not flyEnabled then return end
 		if not HRP or not HRP.Parent then stopFly(); return end
-		local cf=workspace.CurrentCamera.CFrame
-		local md=Vector3.zero
+		local cf = workspace.CurrentCamera.CFrame
+		local md = Vector3.zero
 		if mob then
-			local stick=getMobileThumbstick()
-			-- use full camera look vector so tilting camera up/down controls altitude
-			if math.abs(stick.Y) > 0.1 then md = md + cf.LookVector * stick.Y end
-			if math.abs(stick.X) > 0.1 then md = md + cf.RightVector * stick.X end
+			local stick = getMobileThumbstick()
+			if math.abs(stick.X) > 0.08 or math.abs(stick.Y) > 0.08 then
+				md = md + cf.LookVector * stick.Y
+				md = md + cf.RightVector * stick.X
+			end
 		else
 			if UserInputService:IsKeyDown(Enum.KeyCode.W) then md=md+cf.LookVector end
 			if UserInputService:IsKeyDown(Enum.KeyCode.S) then md=md-cf.LookVector end
@@ -310,8 +337,8 @@ local function startFly()
 			if UserInputService:IsKeyDown(Enum.KeyCode.Space) then md=md+Vector3.new(0,1,0) end
 			if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then md=md-Vector3.new(0,1,0) end
 		end
-		flyBody.Velocity=md.Magnitude>0 and md.Unit*FLY_SPEED or Vector3.zero
-		flyGyro.CFrame=cf
+		flyBody.Velocity = md.Magnitude > 0 and md.Unit * FLY_SPEED or Vector3.zero
+		flyGyro.CFrame = cf
 	end)
 end
 Player.CharacterAdded:Connect(function() if flyEnabled then task.wait(0.5); startFly() end end)
