@@ -249,77 +249,59 @@ task.spawn(function()
 end)
 
 local flyEnabled,flyBody,flyGyro,flyConn=false,nil,nil,nil
-local mobileFlyUp,mobileFlyDown=false,false
-local mobileFlyDir=Vector2.new(0,0)
 
-local flyUI=nil
-local function createFlyUI(sg)
-	if flyUI then return end
-	flyUI=Instance.new("Frame")
-	flyUI.Name="FlyUI"
-	flyUI.Size=UDim2.new(1,0,0,140)
-	flyUI.Position=UDim2.new(0,0,1,-150)
-	flyUI.BackgroundTransparency=1
-	flyUI.ZIndex=50; flyUI.Visible=false; flyUI.Parent=sg
-
-	local BW,BH=60,54
-	local function makeBtn(text,pos,onDown,onUp)
-		local btn=Instance.new("TextButton")
-		btn.Size=UDim2.new(0,BW,0,BH)
-		btn.Position=pos
-		btn.BackgroundColor3=Color3.fromRGB(30,30,60)
-		btn.BackgroundTransparency=0.3
-		btn.BorderSizePixel=0
-		btn.Text=text
-		btn.TextColor3=Color3.fromRGB(255,255,255)
-		btn.Font=Enum.Font.GothamBold
-		btn.TextSize=18
-		btn.ZIndex=51
-		btn.Parent=flyUI
-		Instance.new("UICorner",btn).CornerRadius=UDim.new(0,12)
-		Instance.new("UIStroke",btn).Color=Color3.fromRGB(100,100,200)
-		btn.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch then onDown() end end)
-		btn.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch then onUp() end end)
-		return btn
-	end
-
-	-- Left cluster: movement (forward/back/left/right)
-	local LX=16
-	makeBtn("▲",UDim2.new(0,LX+BW,0,4),       function() mobileFlyDir=Vector2.new(mobileFlyDir.X, 1) end, function() mobileFlyDir=Vector2.new(mobileFlyDir.X, 0) end)
-	makeBtn("▼",UDim2.new(0,LX+BW,0,BH+8),     function() mobileFlyDir=Vector2.new(mobileFlyDir.X,-1) end, function() mobileFlyDir=Vector2.new(mobileFlyDir.X, 0) end)
-	makeBtn("◀",UDim2.new(0,LX,0,(BH+8)/2),    function() mobileFlyDir=Vector2.new(-1,mobileFlyDir.Y) end, function() mobileFlyDir=Vector2.new(0,mobileFlyDir.Y) end)
-	makeBtn("▶",UDim2.new(0,LX+BW*2,0,(BH+8)/2),function() mobileFlyDir=Vector2.new( 1,mobileFlyDir.Y) end, function() mobileFlyDir=Vector2.new(0,mobileFlyDir.Y) end)
-
-	-- Right cluster: up/down
-	makeBtn("↑",UDim2.new(1,-BW-16,0,4),      function() mobileFlyUp=true end,   function() mobileFlyUp=false end)
-	makeBtn("↓",UDim2.new(1,-BW-16,0,BH+8),   function() mobileFlyDown=true end, function() mobileFlyDown=false end)
+local function getMobileThumbstick()
+	local ts = Vector2.new(0,0)
+	pcall(function()
+		local pg = Player.PlayerGui
+		for _,gui in pairs(pg:GetChildren()) do
+			local frame = gui:FindFirstChild("TouchControlFrame")
+			if frame then
+				local stick = frame:FindFirstChild("DynamicThumbstickFrame") or frame:FindFirstChild("ThumbstickFrame")
+				if stick then
+					local inner = stick:FindFirstChild("MovingThumbstick") or stick:FindFirstChild("InnerThumbstick")
+					if inner then
+						local center = stick.AbsolutePosition + stick.AbsoluteSize/2
+						local pos = inner.AbsolutePosition + inner.AbsoluteSize/2
+						local delta = pos - center
+						local maxDist = stick.AbsoluteSize.X / 2
+						if maxDist > 0 then
+							ts = Vector2.new(
+								math.clamp(delta.X / maxDist, -1, 1),
+								math.clamp(-delta.Y / maxDist, -1, 1)
+							)
+						end
+					end
+				end
+			end
+		end
+	end)
+	return ts
 end
 
 local function stopFly()
-	flyEnabled=false; mobileFlyDir=Vector2.new(0,0); mobileFlyUp=false; mobileFlyDown=false
+	flyEnabled=false
 	if flyConn then flyConn:Disconnect(); flyConn=nil end
 	if flyBody then flyBody:Destroy(); flyBody=nil end
 	if flyGyro then flyGyro:Destroy(); flyGyro=nil end
-	if flyUI then flyUI.Visible=false end
 	local char=Player.Character; if char then local hum=char:FindFirstChildOfClass("Humanoid"); if hum then hum.PlatformStand=false end end
 end
+
 local function startFly()
 	flyEnabled=true; local char=Player.Character; if not char or not HRP then return end
 	local hum=char:FindFirstChildOfClass("Humanoid"); if hum then hum.PlatformStand=true end
 	flyBody=Instance.new("BodyVelocity"); flyBody.Velocity=Vector3.zero; flyBody.MaxForce=Vector3.new(1e5,1e5,1e5); flyBody.Parent=HRP
 	flyGyro=Instance.new("BodyGyro"); flyGyro.MaxTorque=Vector3.new(1e5,1e5,1e5); flyGyro.P=1e4; flyGyro.CFrame=HRP.CFrame; flyGyro.Parent=HRP
-	if mob and flyUI then flyUI.Visible=true end
 	flyConn=RunService.Heartbeat:Connect(function()
-		if not flyEnabled then return end; if not HRP or not HRP.Parent then stopFly(); return end
-		local cf=workspace.CurrentCamera.CFrame; local md=Vector3.zero
+		if not flyEnabled then return end
+		if not HRP or not HRP.Parent then stopFly(); return end
+		local cf=workspace.CurrentCamera.CFrame
+		local md=Vector3.zero
 		if mob then
-			-- mobile: use virtual buttons
-			if mobileFlyDir.Y>0 then md=md+cf.LookVector end
-			if mobileFlyDir.Y<0 then md=md-cf.LookVector end
-			if mobileFlyDir.X<0 then md=md-cf.RightVector end
-			if mobileFlyDir.X>0 then md=md+cf.RightVector end
-			if mobileFlyUp then md=md+Vector3.new(0,1,0) end
-			if mobileFlyDown then md=md-Vector3.new(0,1,0) end
+			local stick=getMobileThumbstick()
+			-- use full camera look vector so tilting camera up/down controls altitude
+			if math.abs(stick.Y) > 0.1 then md = md + cf.LookVector * stick.Y end
+			if math.abs(stick.X) > 0.1 then md = md + cf.RightVector * stick.X end
 		else
 			if UserInputService:IsKeyDown(Enum.KeyCode.W) then md=md+cf.LookVector end
 			if UserInputService:IsKeyDown(Enum.KeyCode.S) then md=md-cf.LookVector end
@@ -328,7 +310,8 @@ local function startFly()
 			if UserInputService:IsKeyDown(Enum.KeyCode.Space) then md=md+Vector3.new(0,1,0) end
 			if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then md=md-Vector3.new(0,1,0) end
 		end
-		flyBody.Velocity=md.Magnitude>0 and md.Unit*FLY_SPEED or Vector3.zero; flyGyro.CFrame=cf
+		flyBody.Velocity=md.Magnitude>0 and md.Unit*FLY_SPEED or Vector3.zero
+		flyGyro.CFrame=cf
 	end)
 end
 Player.CharacterAdded:Connect(function() if flyEnabled then task.wait(0.5); startFly() end end)
@@ -428,7 +411,6 @@ local function safeTap(btn, cb)
 end
 
 local sg = newI("ScreenGui",playerGui,{Name="CtrlUI",ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,IgnoreGuiInset=true})
-if mob then createFlyUI(sg) end
 
 local function ShowNotif(title,msg,kind)
 	local colors={info=Color3.fromRGB(91,91,255),success=Color3.fromRGB(34,197,94),error=Color3.fromRGB(220,50,50),warn=Color3.fromRGB(234,179,8)}
