@@ -1,5 +1,4 @@
 -- Muslimdevs | Hub v2.0 — Full Script
--- Game logic + Fixed GUI with do...end page blocks (fixes local register > 200)
 
 local Players           = game:GetService("Players")
 local UserInputService  = game:GetService("UserInputService")
@@ -303,19 +302,27 @@ local function scanTreeNames()
 	table.sort(names); table.insert(names,1,"All Trees"); return names
 end
 
--- ════════════════════════════════════════════
+-- ══════════════════════════════════════════════════════
 -- GUI
--- ════════════════════════════════════════════
+-- ══════════════════════════════════════════════════════
 
-local UIS=UserInputService; local playerGui=Player:WaitForChild("PlayerGui")
+local UIS = UserInputService
+local playerGui = Player:WaitForChild("PlayerGui")
 for _,v in pairs(playerGui:GetChildren()) do if v.Name=="CtrlUI" then v:Destroy() end end
 task.wait(0.1)
 
-local mob=UIS.TouchEnabled and not UIS.KeyboardEnabled
-local GW=mob and 445 or 720; local GH=mob and 360 or 490; local SW=mob and 150 or 180
-local CPad=mob and 10 or 14; local LS=mob and 11 or 13; local HH=mob and 40 or 44; local TCH=mob and 48 or 62
+local mob = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
-local T={
+-- SIZE — matches standalone file
+local GW  = mob and 445 or 720
+local GH  = mob and 360 or 490
+local SW  = mob and 150 or 180
+local CPad = mob and 10 or 14
+local LS  = mob and 11 or 13
+local HH  = mob and 40 or 44
+local TCH = mob and 48 or 62
+
+local T = {
 	Midnight={name="Midnight",bg0=Color3.fromRGB(10,11,16),bg1=Color3.fromRGB(15,17,24),bg2=Color3.fromRGB(22,25,37),bg3=Color3.fromRGB(30,35,51),surface=Color3.fromRGB(26,31,46),acc1=Color3.fromRGB(124,106,247),acc2=Color3.fromRGB(91,142,245),acc3=Color3.fromRGB(247,106,106),acc4=Color3.fromRGB(106,247,184),text0=Color3.fromRGB(255,255,255),text1=Color3.fromRGB(200,204,220),text2=Color3.fromRGB(122,128,153),text3=Color3.fromRGB(74,80,112),desc="Deep purple dark"},
 	Aurora={name="Aurora",bg0=Color3.fromRGB(8,14,20),bg1=Color3.fromRGB(11,20,32),bg2=Color3.fromRGB(15,28,46),bg3=Color3.fromRGB(22,36,53),surface=Color3.fromRGB(15,30,48),acc1=Color3.fromRGB(0,229,204),acc2=Color3.fromRGB(0,184,217),acc3=Color3.fromRGB(255,107,157),acc4=Color3.fromRGB(163,230,53),text0=Color3.fromRGB(232,248,255),text1=Color3.fromRGB(176,204,224),text2=Color3.fromRGB(90,122,144),text3=Color3.fromRGB(58,80,96),desc="Teal & cyan ocean"},
 	Obsidian={name="Obsidian",bg0=Color3.fromRGB(13,13,13),bg1=Color3.fromRGB(17,17,17),bg2=Color3.fromRGB(24,24,24),bg3=Color3.fromRGB(32,32,32),surface=Color3.fromRGB(22,22,22),acc1=Color3.fromRGB(224,201,122),acc2=Color3.fromRGB(176,160,96),acc3=Color3.fromRGB(224,122,122),acc4=Color3.fromRGB(122,184,142),text0=Color3.fromRGB(240,236,224),text1=Color3.fromRGB(192,184,152),text2=Color3.fromRGB(122,112,96),text3=Color3.fromRGB(80,72,56),desc="Pure black & gold"},
@@ -325,14 +332,51 @@ local T={
 	Solar={name="Solar",bg0=Color3.fromRGB(14,10,4),bg1=Color3.fromRGB(20,14,6),bg2=Color3.fromRGB(28,20,8),bg3=Color3.fromRGB(36,28,14),surface=Color3.fromRGB(26,16,8),acc1=Color3.fromRGB(255,160,32),acc2=Color3.fromRGB(224,128,16),acc3=Color3.fromRGB(240,64,64),acc4=Color3.fromRGB(128,224,64),text0=Color3.fromRGB(255,248,232),text1=Color3.fromRGB(208,192,152),text2=Color3.fromRGB(128,112,64),text3=Color3.fromRGB(80,72,40),desc="Warm amber desert"},
 }
 local tOrder={"Midnight","Aurora","Obsidian","Crimson","Arctic","Forest","Solar"}
-local ct=T.Midnight; local dragging,activeSlider,activeTouchId=false,nil,nil
+local ct=T.Midnight
+
+local dragging = false
+local activeTouchId = nil
+local activeSlider = nil
 
 local function tw(o,p,d) TweenService:Create(o,TweenInfo.new(d or 0.18,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),p):Play() end
 local function newI(cls,par,props) local o=Instance.new(cls); if par then o.Parent=par end; if props then for k,v in pairs(props) do o[k]=v end end; return o end
 local function corner(o,r) Instance.new("UICorner",o).CornerRadius=UDim.new(0,r or 12) end
 local function pad(o,l,r,t,b) local p=Instance.new("UIPadding",o); p.PaddingLeft=UDim.new(0,l); p.PaddingRight=UDim.new(0,r or l); p.PaddingTop=UDim.new(0,t or l); p.PaddingBottom=UDim.new(0,b or t or l) end
 
-local sg=newI("ScreenGui",playerGui,{Name="CtrlUI",ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,IgnoreGuiInset=true})
+-- safeTap: on mobile, only fires if finger didn't scroll (move < 12px).
+-- On PC, just uses MouseButton1Click normally.
+local function safeTap(btn, cb)
+	if mob then
+		btn.InputBegan:Connect(function(i)
+			if i.UserInputType ~= Enum.UserInputType.Touch then return end
+			local startX, startY = i.Position.X, i.Position.Y
+			local moved = false
+			local moveConn, endConn
+			moveConn = UIS.InputChanged:Connect(function(m)
+				if m.UserInputType ~= Enum.UserInputType.Touch then return end
+				if math.abs(m.Position.X-startX) > 12 or math.abs(m.Position.Y-startY) > 12 then
+					moved = true
+				end
+			end)
+			endConn = i.Changed:Connect(function()
+				if i.UserInputState == Enum.UserInputState.End then
+					moveConn:Disconnect(); endConn:Disconnect()
+					if not moved then
+						task.defer(cb)
+					end
+				end
+			end)
+		end)
+	else
+		btn.MouseButton1Click:Connect(cb)
+	end
+	-- always wire mouse click too for PC
+	if mob then
+		btn.MouseButton1Click:Connect(cb)
+	end
+end
+
+local sg = newI("ScreenGui",playerGui,{Name="CtrlUI",ResetOnSpawn=false,ZIndexBehavior=Enum.ZIndexBehavior.Sibling,IgnoreGuiInset=true})
 
 local function ShowNotif(title,msg,kind)
 	local colors={info=Color3.fromRGB(91,91,255),success=Color3.fromRGB(34,197,94),error=Color3.fromRGB(220,50,50),warn=Color3.fromRGB(234,179,8)}
@@ -346,16 +390,19 @@ local function ShowNotif(title,msg,kind)
 	task.delay(3,function() TweenService:Create(nf,TweenInfo.new(0.3,Enum.EasingStyle.Quint,Enum.EasingDirection.In),{Position=UDim2.new(1,10,1,-88)}):Play(); task.delay(0.35,function() nf:Destroy() end) end)
 end
 
-local SSW,SSH=GW+16,GH+16
-local shadow=newI("Frame",sg,{Name="Shadow",Size=UDim2.new(0,SSW,0,SSH),Position=UDim2.new(0.5,-(SSW/2)+4,0.5,-(SSH/2)+4),BackgroundColor3=Color3.new(0,0,0),BackgroundTransparency=0.8,BorderSizePixel=0,ZIndex=1}); corner(shadow,22)
-local root=newI("Frame",sg,{Name="Root",Size=UDim2.new(0,GW,0,GH),Position=UDim2.new(0.5,-(GW/2),0.5,-(GH/2)),BackgroundColor3=ct.bg1,BorderSizePixel=0,ZIndex=2,ClipsDescendants=true}); corner(root,14)
-local rootStroke=newI("UIStroke",root,{Color=ct.acc1,Thickness=1,Transparency=0.6})
+local SSW,SSH = GW+16, GH+16
+local shadow = newI("Frame",sg,{Name="Shadow",Size=UDim2.new(0,SSW,0,SSH),Position=UDim2.new(0.5,-(SSW/2)+4,0.5,-(SSH/2)+4),BackgroundColor3=Color3.new(0,0,0),BackgroundTransparency=0.8,BorderSizePixel=0,ZIndex=1}); corner(shadow,22)
+local root = newI("Frame",sg,{Name="Root",Size=UDim2.new(0,GW,0,GH),Position=UDim2.new(0.5,-(GW/2),0.5,-(GH/2)),BackgroundColor3=ct.bg1,BorderSizePixel=0,ZIndex=2,ClipsDescendants=true}); corner(root,14)
+local rootStroke = newI("UIStroke",root,{Color=ct.acc1,Thickness=1,Transparency=0.6})
 
+-- DRAG — only wired on header/brand, won't conflict with content taps
 local function wireDrag(h)
 	h.InputBegan:Connect(function(i)
 		if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
-			if dragging then return end; dragging=true; activeTouchId=i
-			local sx=root.Position.X.Offset; local sy=root.Position.Y.Offset; local ix=i.Position.X; local iy=i.Position.Y
+			if dragging then return end
+			dragging=true; activeTouchId=i
+			local sx=root.Position.X.Offset; local sy=root.Position.Y.Offset
+			local ix=i.Position.X; local iy=i.Position.Y
 			local conn; conn=UIS.InputChanged:Connect(function(m)
 				if not dragging then conn:Disconnect(); return end
 				if m.UserInputType~=Enum.UserInputType.MouseMovement and m.UserInputType~=Enum.UserInputType.Touch then return end
@@ -364,29 +411,46 @@ local function wireDrag(h)
 			end)
 		end
 	end)
-	h.InputEnded:Connect(function(i) if i==activeTouchId or i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false; activeTouchId=nil end end)
+	h.InputEnded:Connect(function(i)
+		if i==activeTouchId or i.UserInputType==Enum.UserInputType.MouseButton1 then
+			dragging=false; activeTouchId=nil
+		end
+	end)
 end
-UIS.InputEnded:Connect(function(i) if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then dragging=false; activeSlider=nil; activeTouchId=nil end end)
-UIS.InputChanged:Connect(function(i)
-	if activeSlider and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
-		local s=activeSlider; local p=math.clamp((i.Position.X-s.track.AbsolutePosition.X)/s.track.AbsoluteSize.X,0,1); local v=math.floor(s.minV+p*(s.maxV-s.minV))
-		s.fill.Size=UDim2.new(p,0,1,0); s.thumb.Position=UDim2.new(p,0,0.5,0); s.badge.Text=tostring(v); if s.cb then s.cb(v) end
+
+UIS.InputEnded:Connect(function(i)
+	if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+		dragging=false; activeSlider=nil; activeTouchId=nil
 	end
 end)
 
+UIS.InputChanged:Connect(function(i)
+	if activeSlider and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+		local s=activeSlider
+		local p=math.clamp((i.Position.X-s.track.AbsolutePosition.X)/s.track.AbsoluteSize.X,0,1)
+		local v=math.floor(s.minV+p*(s.maxV-s.minV))
+		s.fill.Size=UDim2.new(p,0,1,0); s.thumb.Position=UDim2.new(p,0,0.5,0); s.badge.Text=tostring(v)
+		if s.cb then s.cb(v) end
+	end
+end)
+
+-- SIDEBAR
 local sidebar=newI("Frame",root,{Size=UDim2.new(0,SW,1,0),BackgroundColor3=ct.bg0,BorderSizePixel=0}); corner(sidebar,14)
 local sideClip=newI("Frame",sidebar,{Size=UDim2.new(0,14,1,0),Position=UDim2.new(1,-14,0,0),BackgroundColor3=ct.bg0,BorderSizePixel=0,ZIndex=3})
 local brandLbl=newI("TextLabel",sidebar,{Size=UDim2.new(1,0,0,44),BackgroundTransparency=1,Text="Muslimdevs | Hub",Font=Enum.Font.GothamBold,TextSize=mob and 11 or 14,TextColor3=ct.acc1,TextXAlignment=Enum.TextXAlignment.Center,TextWrapped=true})
 local shimCols={ct.acc1,ct.text0,ct.acc2,ct.acc4,ct.text0,ct.acc1}; local shimIdx=1
 task.spawn(function() while brandLbl and brandLbl.Parent do shimIdx=(shimIdx%#shimCols)+1; TweenService:Create(brandLbl,TweenInfo.new(0.6,Enum.EasingStyle.Sine,Enum.EasingDirection.InOut),{TextColor3=shimCols[shimIdx]}):Play(); task.wait(0.6) end end)
+
 local floatBtn=newI("ImageButton",sg,{Name="FloatBtn",Size=UDim2.new(0,56,0,56),Position=UDim2.new(0,20,0.5,-28),BackgroundColor3=ct.acc1,BorderSizePixel=0,Image="rbxassetid://86879186972098",ImageColor3=Color3.new(1,1,1),ZIndex=20,Visible=false}); corner(floatBtn,28)
 local floatStroke=newI("UIStroke",floatBtn,{Color=ct.acc1,Thickness=2,Transparency=0.3})
 local function startPulse() local function loop() if not floatBtn.Visible then return end; tw(floatStroke,{Transparency=0.7},0.6); task.delay(0.6,function() if not floatBtn.Visible then return end; tw(floatStroke,{Transparency=0.1},0.6); task.delay(0.6,loop) end) end; loop() end
 local function minimize() tw(root,{Size=UDim2.new(0,0,0,0),Position=UDim2.new(0,root.Position.X.Offset+(GW/2),0,root.Position.Y.Offset+(GH/2))},0.25); tw(shadow,{BackgroundTransparency=1},0.2); task.delay(0.25,function() root.Visible=false; shadow.Visible=false; floatBtn.Visible=true; floatStroke.Color=ct.acc1; startPulse() end) end
 local function restore() floatBtn.Visible=false; shadow.Visible=true; shadow.BackgroundTransparency=1; root.Visible=true; root.Size=UDim2.new(0,0,0,0); local s=sg.AbsoluteSize; local cx,cy=math.floor(s.X/2-GW/2),math.floor(s.Y/2-GH/2); root.Position=UDim2.new(0,cx+GW/2,0,cy+GH/2); shadow.Position=UDim2.new(0,cx+GW/2-4,0,cy+GH/2+4); tw(root,{Size=UDim2.new(0,GW,0,GH),Position=UDim2.new(0,cx,0,cy)},0.28); tw(shadow,{Size=UDim2.new(0,SSW,0,SSH),Position=UDim2.new(0,cx-8,0,cy+4),BackgroundTransparency=0.8},0.28) end
+
 newI("Frame",sidebar,{Size=UDim2.new(1,0,0,1),Position=UDim2.new(0,0,0,44),BackgroundColor3=ct.text3,BorderSizePixel=0,BackgroundTransparency=0.5})
 local navList=newI("ScrollingFrame",sidebar,{Size=UDim2.new(1,0,1,-120),Position=UDim2.new(0,0,0,52),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=0,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true})
 newI("UIListLayout",navList,{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder}); pad(navList,4,4,4,4)
+
 local playerCard=newI("Frame",sidebar,{Size=UDim2.new(1,-8,0,52),Position=UDim2.new(0,4,1,-58),BackgroundColor3=ct.surface,BorderSizePixel=0}); corner(playerCard,10)
 local avatarFrame=newI("Frame",playerCard,{Size=UDim2.new(0,36,0,36),Position=UDim2.new(0,8,0.5,-18),BackgroundColor3=ct.acc1,BorderSizePixel=0}); corner(avatarFrame,18)
 local avatarImg=newI("ImageLabel",avatarFrame,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Image="",ScaleType=Enum.ScaleType.Crop}); corner(avatarImg,18)
@@ -395,6 +459,7 @@ local dotBorder=newI("UIStroke",dot,{Color=ct.bg0,Thickness=2})
 newI("TextLabel",playerCard,{Size=UDim2.new(1,-54,0,18),Position=UDim2.new(0,50,0,8),BackgroundTransparency=1,Text=Player.DisplayName,Font=Enum.Font.GothamBold,TextSize=mob and 10 or 11,TextColor3=ct.text0,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
 newI("TextLabel",playerCard,{Size=UDim2.new(1,-54,0,14),Position=UDim2.new(0,50,0,26),BackgroundTransparency=1,Text="@"..Player.Name,Font=Enum.Font.Gotham,TextSize=mob and 9 or 10,TextColor3=ct.text2,TextXAlignment=Enum.TextXAlignment.Left,TextTruncate=Enum.TextTruncate.AtEnd})
 task.spawn(function() local ok,img=pcall(function() return Players:GetUserThumbnailAsync(Player.UserId,Enum.ThumbnailType.HeadShot,Enum.ThumbnailSize.Size100x100) end); if ok then avatarImg.Image=img end end)
+
 local main=newI("Frame",root,{Size=UDim2.new(1,-SW,1,0),Position=UDim2.new(0,SW,0,0),BackgroundColor3=ct.bg1,BorderSizePixel=0,ClipsDescendants=true}); corner(main,14)
 local headerBar=newI("Frame",main,{Size=UDim2.new(1,0,0,HH),BackgroundColor3=ct.bg0,BorderSizePixel=0})
 local headerDivLine=newI("Frame",headerBar,{Size=UDim2.new(1,0,0,1),Position=UDim2.new(0,0,1,-1),BackgroundColor3=ct.text3,BorderSizePixel=0,BackgroundTransparency=0.5})
@@ -403,74 +468,139 @@ local minBtn=newI("TextButton",headerBar,{Size=UDim2.new(0,22,0,22),Position=UDi
 newI("TextLabel",minBtn,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="-",Font=Enum.Font.GothamBold,TextSize=15,TextColor3=Color3.fromRGB(120,80,0)})
 local closeBtn=newI("TextButton",headerBar,{Size=UDim2.new(0,22,0,22),Position=UDim2.new(1,-24,0.5,-11),BackgroundColor3=Color3.fromRGB(255,80,80),BorderSizePixel=0,Text="",ZIndex=10}); corner(closeBtn,11)
 newI("TextLabel",closeBtn,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="x",Font=Enum.Font.GothamBold,TextSize=12,TextColor3=Color3.fromRGB(140,30,30)})
+
 minBtn.MouseButton1Click:Connect(minimize); minBtn.TouchTap:Connect(minimize)
 closeBtn.MouseButton1Click:Connect(function() tw(shadow,{BackgroundTransparency=1},0.18); tw(root,{Size=UDim2.new(0,0,0,0)},0.2); task.delay(0.22,function() sg:Destroy() end) end)
 closeBtn.TouchTap:Connect(function() tw(shadow,{BackgroundTransparency=1},0.18); tw(root,{Size=UDim2.new(0,0,0,0)},0.2); task.delay(0.22,function() sg:Destroy() end) end)
 floatBtn.MouseButton1Click:Connect(restore); floatBtn.TouchTap:Connect(restore)
 minBtn.MouseEnter:Connect(function() tw(minBtn,{BackgroundColor3=Color3.fromRGB(255,220,80)},0.1) end); minBtn.MouseLeave:Connect(function() tw(minBtn,{BackgroundColor3=Color3.fromRGB(255,190,50)},0.1) end)
 closeBtn.MouseEnter:Connect(function() tw(closeBtn,{BackgroundColor3=Color3.fromRGB(255,120,120)},0.1) end); closeBtn.MouseLeave:Connect(function() tw(closeBtn,{BackgroundColor3=Color3.fromRGB(255,80,80)},0.1) end)
-floatBtn.MouseEnter:Connect(function() tw(floatBtn,{Size=UDim2.new(0,62,0,62),Position=UDim2.new(0,17,0.5,-31)},0.12) end); floatBtn.MouseLeave:Connect(function() tw(floatBtn,{Size=UDim2.new(0,56,0,56),Position=UDim2.new(0,20,0.5,-28)},0.12) end)
 wireDrag(headerBar); wireDrag(brandLbl)
+
 local pageScroll=newI("ScrollingFrame",main,{Size=UDim2.new(1,0,1,-HH),Position=UDim2.new(0,0,0,HH),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=mob and 2 or 3,ScrollBarImageColor3=ct.acc1,CanvasSize=UDim2.new(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true})
 pad(pageScroll,CPad,CPad,CPad,CPad)
+
 local pages={}; local activePageName=nil
+
 local function addPage(name,order)
 	local frame=newI("Frame",pageScroll,{Name=name,Size=UDim2.new(1,-CPad*2,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundTransparency=1,BorderSizePixel=0,Visible=false})
 	newI("UIListLayout",frame,{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder})
 	local btn=newI("TextButton",navList,{Name=name.."Nav",Size=UDim2.new(1,0,0,34),BackgroundColor3=ct.bg1,BorderSizePixel=0,Text=name,Font=Enum.Font.GothamMedium,TextSize=mob and 10 or 12,TextColor3=ct.text2,TextXAlignment=Enum.TextXAlignment.Left,LayoutOrder=order,AutoButtonColor=false}); corner(btn,7); pad(btn,10)
 	pages[name]={frame=frame,btn=btn}
-	btn.MouseButton1Click:Connect(function() for _,pg in pairs(pages) do pg.frame.Visible=false; tw(pg.btn,{BackgroundColor3=ct.bg1,TextColor3=ct.text2},0.15) end; activePageName=name; frame.Visible=true; headerTitle.Text=name; tw(btn,{BackgroundColor3=ct.surface,TextColor3=ct.acc1},0.15) end)
-	btn.TouchTap:Connect(function() btn.MouseButton1Click:Fire() end); return frame
+	local function openPage()
+		for _,pg in pairs(pages) do pg.frame.Visible=false; tw(pg.btn,{BackgroundColor3=ct.bg1,TextColor3=ct.text2},0.15) end
+		activePageName=name; frame.Visible=true; headerTitle.Text=name; tw(btn,{BackgroundColor3=ct.surface,TextColor3=ct.acc1},0.15)
+	end
+	safeTap(btn, openPage)
+	return frame
 end
+
 local function addSection(page,text,order) return newI("TextLabel",page,{Size=UDim2.new(1,0,0,16),BackgroundTransparency=1,Text=text:upper(),Font=Enum.Font.GothamBold,TextSize=9,TextColor3=ct.text3,TextXAlignment=Enum.TextXAlignment.Left,LayoutOrder=order or 0}) end
-local function addCard(page,order) local card=newI("Frame",page,{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundColor3=ct.surface,BorderSizePixel=0,LayoutOrder=order or 0}); corner(card,12); newI("UIStroke",card,{Color=ct.text3,Thickness=1,Transparency=0.5}); pad(card,CPad,CPad,10,10); newI("UIListLayout",card,{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder}); return card end
-local function addToggle(card,labelText,descText,defaultOn,order,cb)
-	local row=newI("Frame",card,{Size=UDim2.new(1,0,0,mob and 40 or 44),BackgroundTransparency=1,LayoutOrder=order or 1})
-	newI("TextLabel",row,{Size=UDim2.new(1,-50,0,18),Position=UDim2.new(0,0,0,4),BackgroundTransparency=1,Text=labelText,Font=Enum.Font.GothamMedium,TextSize=LS,TextColor3=ct.text1,TextXAlignment=Enum.TextXAlignment.Left})
-	if descText and not mob then newI("TextLabel",row,{Size=UDim2.new(1,-50,0,14),Position=UDim2.new(0,0,0,22),BackgroundTransparency=1,Text=descText,Font=Enum.Font.Code,TextSize=10,TextColor3=ct.text3,TextXAlignment=Enum.TextXAlignment.Left}) end
-	local pill=newI("Frame",row,{Name="Pill",Size=UDim2.new(0,36,0,20),Position=UDim2.new(1,-40,0.5,-10),BackgroundColor3=defaultOn and ct.acc1 or ct.bg3,BorderSizePixel=0}); corner(pill,10)
-	local knob=newI("Frame",pill,{Size=UDim2.new(0,14,0,14),Position=defaultOn and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=3}); corner(knob,7)
-	local btn=newI("TextButton",pill,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=""}); local state=defaultOn or false
-	local function toggle() state=not state; tw(pill,{BackgroundColor3=state and ct.acc1 or ct.bg3},0.18); tw(knob,{Position=state and UDim2.new(1,-17,0.5,-7) or UDim2.new(0,3,0.5,-7)},0.18); if cb then cb(state) end end
-	btn.MouseButton1Click:Connect(toggle); btn.TouchTap:Connect(toggle)
+
+local function addCard(page,order)
+	local card=newI("Frame",page,{Size=UDim2.new(1,0,0,0),AutomaticSize=Enum.AutomaticSize.Y,BackgroundColor3=ct.surface,BorderSizePixel=0,LayoutOrder=order or 0}); corner(card,12)
+	newI("UIStroke",card,{Color=ct.text3,Thickness=1,Transparency=0.5}); pad(card,CPad,CPad,10,10)
+	newI("UIListLayout",card,{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder}); return card
 end
+
+-- TOGGLE — bigger pill + larger invisible hit area on mobile
+local function addToggle(card,labelText,descText,defaultOn,order,cb)
+	local rowH = mob and 46 or 44
+	local row=newI("Frame",card,{Size=UDim2.new(1,0,0,rowH),BackgroundTransparency=1,LayoutOrder=order or 1})
+	newI("TextLabel",row,{Size=UDim2.new(1,-60,0,18),Position=UDim2.new(0,0,0,4),BackgroundTransparency=1,Text=labelText,Font=Enum.Font.GothamMedium,TextSize=LS,TextColor3=ct.text1,TextXAlignment=Enum.TextXAlignment.Left})
+	if descText and not mob then newI("TextLabel",row,{Size=UDim2.new(1,-60,0,14),Position=UDim2.new(0,0,0,22),BackgroundTransparency=1,Text=descText,Font=Enum.Font.Code,TextSize=10,TextColor3=ct.text3,TextXAlignment=Enum.TextXAlignment.Left}) end
+	local pillW = mob and 46 or 36
+	local pillH = mob and 26 or 20
+	local knobS = mob and 20 or 14
+	local pill=newI("Frame",row,{Name="Pill",Size=UDim2.new(0,pillW,0,pillH),Position=UDim2.new(1,-(pillW+6),0.5,-(pillH/2)),BackgroundColor3=defaultOn and ct.acc1 or ct.bg3,BorderSizePixel=0}); corner(pill,pillH/2)
+	local knob=newI("Frame",pill,{Size=UDim2.new(0,knobS,0,knobS),Position=defaultOn and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2)),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=3}); corner(knob,knobS/2)
+	-- large invisible hit zone so finger doesn't have to be precise
+	local hitW = mob and 70 or pillW+10
+	local hitH = mob and rowH or pillH+10
+	local hit=newI("TextButton",row,{Size=UDim2.new(0,hitW,0,hitH),Position=UDim2.new(1,-hitW-2,0.5,-(hitH/2)),BackgroundTransparency=1,Text="",ZIndex=5})
+	local state=defaultOn or false
+	local function toggle()
+		state=not state
+		tw(pill,{BackgroundColor3=state and ct.acc1 or ct.bg3},0.18)
+		tw(knob,{Position=state and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2))},0.18)
+		if cb then cb(state) end
+	end
+	safeTap(hit, toggle)
+end
+
+-- SLIDER
 local function addSlider(card,labelText,minV,maxV,defVal,order,cb)
 	local row=newI("Frame",card,{Size=UDim2.new(1,0,0,38),BackgroundTransparency=1,LayoutOrder=order or 1})
 	newI("TextLabel",row,{Size=UDim2.new(0,mob and 60 or 78,0,16),BackgroundTransparency=1,Text=labelText,Font=Enum.Font.Gotham,TextSize=mob and 10 or 12,TextColor3=ct.text2,TextXAlignment=Enum.TextXAlignment.Left})
 	local nb=newI("TextLabel",row,{Size=UDim2.new(0,32,0,18),Position=UDim2.new(1,-32,0,-1),BackgroundColor3=ct.bg2,BorderSizePixel=0,Text=tostring(defVal),Font=Enum.Font.Code,TextSize=11,TextColor3=ct.text1}); corner(nb,4)
-	local tOff=mob and 68 or 84; local track=newI("Frame",row,{Name="Track",Size=UDim2.new(1,-tOff-38,0,mob and 8 or 5),Position=UDim2.new(0,tOff,0,mob and 4 or 6),BackgroundColor3=ct.bg3,BorderSizePixel=0}); corner(track,3)
-	local p0=(defVal-minV)/(maxV-minV); local fill=newI("Frame",track,{Name="Fill",Size=UDim2.new(p0,0,1,0),BackgroundColor3=ct.acc1,BorderSizePixel=0}); corner(fill,3)
-	local ts=mob and 20 or 14; local thumb=newI("Frame",track,{Name="Thumb",Size=UDim2.new(0,ts,0,ts),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(p0,0,0.5,0),BackgroundColor3=Color3.fromRGB(210,220,255),BorderSizePixel=0,ZIndex=5}); corner(thumb,mob and ts/2 or 4)
-	local hit=newI("TextButton",track,{Size=UDim2.new(1,0,0,mob and 36 or 22),Position=UDim2.new(0,0,0.5,mob and -18 or -11),BackgroundTransparency=1,Text="",ZIndex=6})
-	local function startSlide(pos) local p=math.clamp((pos.X-track.AbsolutePosition.X)/track.AbsoluteSize.X,0,1); local v=math.floor(minV+p*(maxV-minV)); fill.Size=UDim2.new(p,0,1,0); thumb.Position=UDim2.new(p,0,0.5,0); nb.Text=tostring(v); if cb then cb(v) end; activeSlider={track=track,minV=minV,maxV=maxV,fill=fill,thumb=thumb,badge=nb,cb=cb} end
-	hit.MouseButton1Down:Connect(function() startSlide(UIS:GetMouseLocation()) end); hit.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch then startSlide(i.Position) end end)
-end
-local function addButton(card,labelText,order,cb)
-	local btn=newI("TextButton",card,{Size=UDim2.new(1,0,0,32),BackgroundColor3=ct.bg3,BorderSizePixel=0,Text=labelText,Font=Enum.Font.GothamBold,TextSize=LS,TextColor3=ct.text0,LayoutOrder=order or 1,AutoButtonColor=false}); corner(btn,8)
-	btn.MouseButton1Click:Connect(function() if cb then cb() end end); btn.TouchTap:Connect(function() if cb then cb() end end)
-	btn.MouseEnter:Connect(function() tw(btn,{BackgroundColor3=ct.acc1},0.12) end); btn.MouseLeave:Connect(function() tw(btn,{BackgroundColor3=ct.bg3},0.12) end); return btn
-end
-local function addDropdown(card,labelText,options,order,cb)
-	local itemH,maxH=30,200; local totalH=math.max(#options*itemH,1); local listH=math.min(totalH,maxH)
-	local row=newI("Frame",card,{Size=UDim2.new(1,0,0,34),BackgroundTransparency=1,LayoutOrder=order or 1,ClipsDescendants=false})
-	newI("TextLabel",row,{Size=UDim2.new(0.42,0,1,0),BackgroundTransparency=1,Text=labelText,Font=Enum.Font.GothamMedium,TextSize=LS,TextColor3=ct.text1,TextXAlignment=Enum.TextXAlignment.Left})
-	local sel=newI("TextButton",row,{Size=UDim2.new(0.58,-4,0,28),Position=UDim2.new(0.42,4,0.5,-14),BackgroundColor3=ct.bg3,BorderSizePixel=0,Text="Select  ▾",Font=Enum.Font.Gotham,TextSize=LS-1,TextColor3=ct.text1,AutoButtonColor=false,ZIndex=5}); corner(sel,6); newI("UIStroke",sel,{Color=ct.text3,Thickness=1,Transparency=0.5})
-	local lf=newI("ScrollingFrame",sg,{Size=UDim2.new(0,10,0,10),BackgroundColor3=ct.bg0,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=ct.acc1,CanvasSize=UDim2.new(0,0,0,totalH),Visible=false,ZIndex=200,ClipsDescendants=true}); corner(lf,6); newI("UIStroke",lf,{Color=ct.acc1,Thickness=1.5,Transparency=0.3}); newI("UIPadding",lf,{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,4),PaddingLeft=UDim.new(0,4),PaddingRight=UDim.new(0,4)}); newI("UIListLayout",lf,{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder})
-	local blocker=newI("TextButton",sg,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=199,Visible=false,AutoButtonColor=false})
-	for i,opt in ipairs(options) do
-		local ob=newI("TextButton",lf,{Name="opt_"..i,Size=UDim2.new(1,0,0,itemH-2),BackgroundColor3=ct.bg2,BorderSizePixel=0,Text=opt,Font=Enum.Font.Gotham,TextSize=LS-1,TextColor3=ct.text0,AutoButtonColor=false,ZIndex=201}); corner(ob,5)
-		local cap=opt; local function pick() sel.Text=cap.."  ▾"; sel.TextColor3=ct.acc1; lf.Visible=false; blocker.Visible=false; if cb then cb(cap) end end
-		ob.MouseButton1Click:Connect(pick); ob.TouchTap:Connect(pick); ob.MouseEnter:Connect(function() ob.BackgroundColor3=ct.surface end); ob.MouseLeave:Connect(function() ob.BackgroundColor3=ct.bg2 end)
+	local tOff=mob and 68 or 84
+	local track=newI("Frame",row,{Name="Track",Size=UDim2.new(1,-tOff-38,0,mob and 8 or 5),Position=UDim2.new(0,tOff,0,mob and 4 or 6),BackgroundColor3=ct.bg3,BorderSizePixel=0}); corner(track,3)
+	local p0=(defVal-minV)/(maxV-minV)
+	local fill=newI("Frame",track,{Name="Fill",Size=UDim2.new(p0,0,1,0),BackgroundColor3=ct.acc1,BorderSizePixel=0}); corner(fill,3)
+	local ts=mob and 20 or 14
+	local thumb=newI("Frame",track,{Name="Thumb",Size=UDim2.new(0,ts,0,ts),AnchorPoint=Vector2.new(0.5,0.5),Position=UDim2.new(p0,0,0.5,0),BackgroundColor3=Color3.fromRGB(210,220,255),BorderSizePixel=0,ZIndex=5}); corner(thumb,mob and ts/2 or 4)
+	local hit=newI("TextButton",track,{Size=UDim2.new(1,0,0,mob and 40 or 22),Position=UDim2.new(0,0,0.5,mob and -20 or -11),BackgroundTransparency=1,Text="",ZIndex=6})
+	local function startSlide(pos)
+		local p=math.clamp((pos.X-track.AbsolutePosition.X)/track.AbsoluteSize.X,0,1)
+		local v=math.floor(minV+p*(maxV-minV))
+		fill.Size=UDim2.new(p,0,1,0); thumb.Position=UDim2.new(p,0,0.5,0); nb.Text=tostring(v)
+		if cb then cb(v) end
+		activeSlider={track=track,minV=minV,maxV=maxV,fill=fill,thumb=thumb,badge=nb,cb=cb}
 	end
-	local function closeList() lf.Visible=false; blocker.Visible=false end
-	local function openList() local bp=sel.AbsolutePosition; local bs=sel.AbsoluteSize; lf.Size=UDim2.new(0,math.max(bs.X,160),0,listH); lf.Position=UDim2.new(0,bp.X,0,bp.Y+bs.Y+2); blocker.Visible=true; lf.Visible=true end
-	blocker.MouseButton1Click:Connect(closeList); blocker.TouchTap:Connect(closeList)
-	sel.MouseButton1Click:Connect(function() if lf.Visible then closeList() else openList() end end); sel.TouchTap:Connect(function() if lf.Visible then closeList() else openList() end end); return sel
+	hit.MouseButton1Down:Connect(function() startSlide(UIS:GetMouseLocation()) end)
+	hit.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch then startSlide(i.Position) end end)
 end
 
--- ════════════════════════════════════════════
--- PAGES — each in its own do...end block
--- ════════════════════════════════════════════
+-- BUTTON
+local function addButton(card,labelText,order,cb)
+	local btn=newI("TextButton",card,{Size=UDim2.new(1,0,0,mob and 38 or 32),BackgroundColor3=ct.bg3,BorderSizePixel=0,Text=labelText,Font=Enum.Font.GothamBold,TextSize=LS,TextColor3=ct.text0,LayoutOrder=order or 1,AutoButtonColor=false}); corner(btn,8)
+	safeTap(btn, function() if cb then cb() end end)
+	btn.MouseEnter:Connect(function() tw(btn,{BackgroundColor3=ct.acc1},0.12) end)
+	btn.MouseLeave:Connect(function() tw(btn,{BackgroundColor3=ct.bg3},0.12) end)
+	return btn
+end
+
+-- DROPDOWN
+local function addDropdown(card,labelText,options,order,cb)
+	local itemH = mob and 36 or 30
+	local maxH = mob and 220 or 200
+	local totalH=math.max(#options*itemH,1); local listH=math.min(totalH,maxH)
+	local rowH = mob and 42 or 34
+	local row=newI("Frame",card,{Size=UDim2.new(1,0,0,rowH),BackgroundTransparency=1,LayoutOrder=order or 1,ClipsDescendants=false})
+	newI("TextLabel",row,{Size=UDim2.new(0.40,0,1,0),BackgroundTransparency=1,Text=labelText,Font=Enum.Font.GothamMedium,TextSize=LS,TextColor3=ct.text1,TextXAlignment=Enum.TextXAlignment.Left})
+	local selH = mob and 34 or 28
+	local sel=newI("TextButton",row,{Size=UDim2.new(0.60,-4,0,selH),Position=UDim2.new(0.40,4,0.5,-(selH/2)),BackgroundColor3=ct.bg3,BorderSizePixel=0,Text="Select  ▾",Font=Enum.Font.Gotham,TextSize=LS,TextColor3=ct.text1,AutoButtonColor=false,ZIndex=5}); corner(sel,6)
+	newI("UIStroke",sel,{Color=ct.text3,Thickness=1,Transparency=0.5})
+	local lf=newI("ScrollingFrame",sg,{Size=UDim2.new(0,10,0,10),BackgroundColor3=ct.bg0,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=ct.acc1,CanvasSize=UDim2.new(0,0,0,totalH),Visible=false,ZIndex=200,ClipsDescendants=true}); corner(lf,6)
+	newI("UIStroke",lf,{Color=ct.acc1,Thickness=1.5,Transparency=0.3})
+	newI("UIPadding",lf,{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,4),PaddingLeft=UDim.new(0,4),PaddingRight=UDim.new(0,4)})
+	newI("UIListLayout",lf,{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder})
+	local blocker=newI("TextButton",sg,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=199,Visible=false,AutoButtonColor=false})
+	local function closeList() lf.Visible=false; blocker.Visible=false end
+	local function openList()
+		local bp=sel.AbsolutePosition; local bs=sel.AbsoluteSize
+		lf.Size=UDim2.new(0,math.max(bs.X,mob and 200 or 160),0,listH)
+		lf.Position=UDim2.new(0,bp.X,0,bp.Y+bs.Y+2)
+		blocker.Visible=true; lf.Visible=true
+	end
+	for i,opt in ipairs(options) do
+		local ob=newI("TextButton",lf,{Name="opt_"..i,Size=UDim2.new(1,0,0,itemH-2),BackgroundColor3=ct.bg2,BorderSizePixel=0,Text=opt,Font=Enum.Font.Gotham,TextSize=LS,TextColor3=ct.text0,AutoButtonColor=false,ZIndex=201}); corner(ob,5)
+		local cap=opt
+		safeTap(ob, function()
+			sel.Text=cap.."  ▾"; sel.TextColor3=ct.acc1
+			closeList(); if cb then cb(cap) end
+		end)
+		ob.MouseEnter:Connect(function() ob.BackgroundColor3=ct.surface end)
+		ob.MouseLeave:Connect(function() ob.BackgroundColor3=ct.bg2 end)
+	end
+	safeTap(blocker, closeList)
+	safeTap(sel, function() if lf.Visible then closeList() else openList() end end)
+	return sel
+end
+
+-- ══════════════════════════════════════════════════════
+-- PAGES
+-- ══════════════════════════════════════════════════════
 
 do -- HUB
 	local p=addPage("Hub",1); local c=addCard(p,1)
@@ -486,7 +616,7 @@ do -- KILL
 	addToggle(c,"Auto Cut","auto cut trees",false,1,function(v) CONFIG.ENABLED=v; ShowNotif("Auto Cut",v and "Enabled." or "Disabled.",v and "success" or "warn") end)
 	addSlider(c,"Range",0,100,80,2,function(v) CONFIG.CUT_RANGE=v end)
 	addSection(p,"Kill Aura",3); local c2=addCard(p,4)
-	addToggle(c2,"Kill Aura","attack nearby NPCs",false,1,function(v) KILL_CONFIG.ENABLED=v; ShowNotif("Kill Aura",v and "Enabled "..KILL_CONFIG.RANGE.." studs." or "Disabled.",v and "success" or "warn") end)
+	addToggle(c2,"Kill Aura","attack nearby NPCs",false,1,function(v) KILL_CONFIG.ENABLED=v; ShowNotif("Kill Aura",v and "Enabled." or "Disabled.",v and "success" or "warn") end)
 	addSlider(c2,"Kill Range",5,150,30,2,function(v) KILL_CONFIG.RANGE=v end)
 end
 
@@ -494,7 +624,8 @@ do -- LOGS
 	local p=addPage("Logs",3); local c=addCard(p,1)
 	addSlider(c,"Height Above",5,15,10,1,function(v) CAMPFIRE_CONFIG.HEIGHT_ABOVE=math.floor((v/5)+0.5)*5 end)
 	addButton(c,"Bring All Logs",2,function()
-		local logs=getLogs(); if #logs==0 then ShowNotif("Logs","No Logs found!","warn") return end; if not HRP or not HRP.Parent then return end; local done=0
+		local logs=getLogs(); if #logs==0 then ShowNotif("Logs","No Logs found!","warn") return end
+		if not HRP or not HRP.Parent then return end; local done=0
 		for _,lm in ipairs(logs) do local m2=lm:FindFirstChild("Main") or lm:FindFirstChildWhichIsA("BasePart",true); if m2 and m2:IsA("BasePart") then m2.CFrame=HRP.CFrame*CFrame.new(math.random(-3,3),15,math.random(-3,3)); pcall(function() RequestStartDragging:FireServer(lm) end); done+=1 end end
 		ShowNotif("Logs","Brought "..done.." log(s)!","success")
 	end)
@@ -515,14 +646,14 @@ do -- ITEMS
 	addSection(p,"Item Bring",1); local c=addCard(p,2)
 	addDropdown(c,"Item",scanItemNames(),1,function(v) BRING_ITEM=v end)
 	addButton(c,"Bring Item",2,function()
-		if not BRING_ITEM then ShowNotif("No Item","Select first.","warn") return end
+		if not BRING_ITEM then ShowNotif("","Select item first.","warn") return end
 		local folder=workspace:FindFirstChild("Items"); if not folder then return end
 		for _,child in pairs(folder:GetChildren()) do if child.Name==BRING_ITEM then local part=child:FindFirstChildWhichIsA("BasePart",true); if part then part.CFrame=HRP.CFrame*CFrame.new(math.random(-4,4),15,math.random(-4,4)); pcall(function() RequestStartDragging:FireServer(child) end) end end end
 		ShowNotif("Brought",BRING_ITEM.." brought.","success")
 	end)
 	addDropdown(c,"Food",FOOD_NAMES,3,function(v) BRING_FOOD=v end)
 	addButton(c,"Bring Food",4,function()
-		if not BRING_FOOD then ShowNotif("No Food","Select first.","warn") return end
+		if not BRING_FOOD then ShowNotif("","Select food first.","warn") return end
 		local folder=workspace:FindFirstChild("Items"); if not folder then return end
 		for _,child in pairs(folder:GetChildren()) do if child.Name==BRING_FOOD then local part=child:FindFirstChildWhichIsA("BasePart",true); if part then part.CFrame=HRP.CFrame*CFrame.new(math.random(-4,4),15,math.random(-4,4)); pcall(function() RequestStartDragging:FireServer(child) end) end end end
 		ShowNotif("Brought",BRING_FOOD.." brought.","success")
@@ -530,11 +661,13 @@ do -- ITEMS
 	addButton(c,"Bring All Items",5,function()
 		if not HRP or not HRP.Parent then return end; local folder=workspace:FindFirstChild("Items"); if not folder then return end; local list={}
 		for _,child in pairs(folder:GetChildren()) do local part=child:FindFirstChildWhichIsA("BasePart",true); if part then table.insert(list,{model=child,part=part}) end end
-		if #list==0 then ShowNotif("Items","None found.","warn") return end; ShowNotif("Items","Raining "..#list.."...","info")
+		if #list==0 then ShowNotif("Items","None found.","warn") return end
+		ShowNotif("Items","Raining "..#list.."...","info")
 		task.spawn(function() for _,entry in ipairs(list) do if not HRP or not HRP.Parent then break end; if not entry.part or not entry.part.Parent then continue end; local sp=math.random(3,18); local ang=math.random(0,360); entry.part.CFrame=HRP.CFrame*CFrame.new(math.cos(math.rad(ang))*sp,math.random(20,45),math.sin(math.rad(ang))*sp); pcall(function() RequestStartDragging:FireServer(entry.model) end); task.wait(0.05) end; ShowNotif("Items","Done!","success") end)
 	end)
 	addSection(p,"Gear & Weapons",6); local c2=addCard(p,7)
-	addDropdown(c2,"Gear",GEAR_NAMES,1,function(v) BRING_GEAR=v end); addDropdown(c2,"Weapon",WEAPON_NAMES,2,function(v) BRING_WEAPON=v end)
+	addDropdown(c2,"Gear",GEAR_NAMES,1,function(v) BRING_GEAR=v end)
+	addDropdown(c2,"Weapon",WEAPON_NAMES,2,function(v) BRING_WEAPON=v end)
 	addButton(c2,"Bring Gear",3,function() if not BRING_GEAR then ShowNotif("","Select gear.","warn") return end; bringByName(BRING_GEAR); ShowNotif("Gear",BRING_GEAR.." brought.","success") end)
 	addButton(c2,"Bring Weapon",4,function() if not BRING_WEAPON then ShowNotif("","Select weapon.","warn") return end; bringByName(BRING_WEAPON); ShowNotif("Weapon",BRING_WEAPON.." brought.","success") end)
 	addSection(p,"Coins",8); local c3=addCard(p,9)
@@ -606,7 +739,8 @@ do -- QUEST
 		questRunning=false; ShowNotif("Quest","Done! "..done.."/"..total.." kids returned.","success")
 	end
 	addButton(c,"Start Quest",2,function()
-		if questRunning then ShowNotif("Quest","Already running!","warn") return end; if not HRP or not HRP.Parent then ShowNotif("Quest","No character.","error") return end
+		if questRunning then ShowNotif("Quest","Already running!","warn") return end
+		if not HRP or not HRP.Parent then ShowNotif("Quest","No character.","error") return end
 		questRunning=true; questGen+=1; buildQuestKids(); local g=questGen; ShowNotif("Quest","Starting...","info"); task.spawn(function() runQuestLoop(g) end)
 	end)
 	addButton(c,"Stop Quest",3,function() questRunning=false; questGen+=1; ShowNotif("Quest","Stopped.","warn") end)
@@ -638,12 +772,12 @@ do -- SETTINGS
 		for _,col in ipairs({t.acc1,t.acc2,t.acc3,t.acc4}) do local sw=newI("Frame",sr,{Size=UDim2.new(0,8,0,8),BackgroundColor3=col,BorderSizePixel=0}); corner(sw,4) end
 		newI("TextLabel",card,{Size=UDim2.new(1,-90,0,20),Position=UDim2.new(0,18,0,8),BackgroundTransparency=1,Text=tname,Font=Enum.Font.GothamBold,TextSize=mob and 12 or 14,TextColor3=t.text0,TextXAlignment=Enum.TextXAlignment.Left})
 		if not mob then newI("TextLabel",card,{Size=UDim2.new(1,-90,0,13),Position=UDim2.new(0,18,0,26),BackgroundTransparency=1,Text=t.desc,Font=Enum.Font.Gotham,TextSize=10,TextColor3=t.text2,TextXAlignment=Enum.TextXAlignment.Left}) end
-		local applyBtn=newI("TextButton",card,{Size=UDim2.new(0,mob and 52 or 64,0,26),Position=UDim2.new(1,mob and -62 or -74,0.5,-13),BackgroundColor3=t.acc1,BackgroundTransparency=0.7,BorderSizePixel=0,Text="Apply",Font=Enum.Font.GothamBold,TextSize=mob and 10 or 11,TextColor3=t.acc1}); corner(applyBtn,7)
+		local applyBtn=newI("TextButton",card,{Size=UDim2.new(0,mob and 58 or 64,0,28),Position=UDim2.new(1,mob and -68 or -74,0.5,-14),BackgroundColor3=t.acc1,BackgroundTransparency=0.7,BorderSizePixel=0,Text="Apply",Font=Enum.Font.GothamBold,TextSize=mob and 11 or 11,TextColor3=t.acc1}); corner(applyBtn,7)
 		themeCardFrames[tname]={card=card,stroke=cs,btn=applyBtn}
 		local tn=tname; local function doApply() if applyTheme then applyTheme(T[tn]) end end
-		applyBtn.MouseButton1Click:Connect(doApply); applyBtn.TouchTap:Connect(doApply)
+		safeTap(applyBtn,doApply)
 		applyBtn.MouseEnter:Connect(function() tw(applyBtn,{BackgroundTransparency=0.4},0.1) end); applyBtn.MouseLeave:Connect(function() tw(applyBtn,{BackgroundTransparency=0.7},0.1) end)
-		local cb2=newI("TextButton",card,{Size=UDim2.new(1,-80,1,0),BackgroundTransparency=1,Text="",ZIndex=2}); cb2.MouseButton1Click:Connect(doApply); cb2.TouchTap:Connect(doApply)
+		local cb2=newI("TextButton",card,{Size=UDim2.new(1,-80,1,0),BackgroundTransparency=1,Text="",ZIndex=2}); safeTap(cb2,doApply)
 	end
 	applyTheme=function(t)
 		ct=t; tw(root,{BackgroundColor3=t.bg1},0.22); tw(rootStroke,{Color=t.acc1},0.22)
