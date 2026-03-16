@@ -248,64 +248,30 @@ task.spawn(function()
 	end
 end)
 
-local flyEnabled = false
-local flyBody, flyGyro, flyConn = nil, nil, nil
-
+local flyEnabled,flyBody,flyGyro,flyConn=false,nil,nil,nil
 local function stopFly()
-	flyEnabled = false
-	if flyConn then flyConn:Disconnect(); flyConn = nil end
-	if flyBody then flyBody:Destroy(); flyBody = nil end
-	if flyGyro then flyGyro:Destroy(); flyGyro = nil end
-	local char = Player.Character
-	if char then
-		local hum = char:FindFirstChildOfClass("Humanoid")
-		if hum then hum.PlatformStand = false end
-	end
+	flyEnabled=false; if flyConn then flyConn:Disconnect(); flyConn=nil end
+	if flyBody then flyBody:Destroy(); flyBody=nil end; if flyGyro then flyGyro:Destroy(); flyGyro=nil end
+	local char=Player.Character; if char then local hum=char:FindFirstChildOfClass("Humanoid"); if hum then hum.PlatformStand=false end end
 end
-
 local function startFly()
-	flyEnabled = true
-	local char = Player.Character
-	if not char or not HRP then return end
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if hum then hum.PlatformStand = true end
-
-	flyBody = Instance.new("BodyVelocity")
-	flyBody.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-	flyBody.Velocity = Vector3.zero
-	flyBody.Parent = HRP
-
-	flyGyro = Instance.new("BodyGyro")
-	flyGyro.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-	flyGyro.P = 9e4
-	flyGyro.Parent = HRP
-
-	flyConn = RunService.RenderStepped:Connect(function()
-		if not flyEnabled then return end
-		if not HRP or not HRP.Parent then stopFly(); return end
-		local char2 = Player.Character
-		if not char2 then return end
-		local hum2 = char2:FindFirstChildOfClass("Humanoid")
-		if not hum2 then return end
-		local camCF = workspace.CurrentCamera.CFrame
-		local moveDir = hum2.MoveDirection
-		if moveDir.Magnitude > 0 then
-			local camLookFlat  = Vector3.new(camCF.LookVector.X,  0, camCF.LookVector.Z).Unit
-			local camRightFlat = Vector3.new(camCF.RightVector.X, 0, camCF.RightVector.Z).Unit
-			local fwd   = moveDir:Dot(camLookFlat)
-			local right = moveDir:Dot(camRightFlat)
-			local vel = (camCF.LookVector * fwd + camCF.RightVector * right)
-			flyBody.Velocity = vel.Magnitude > 0 and vel.Unit * FLY_SPEED or Vector3.zero
-		else
-			flyBody.Velocity = Vector3.zero
-		end
-		flyGyro.CFrame = camCF
+	flyEnabled=true; local char=Player.Character; if not char or not HRP then return end
+	local hum=char:FindFirstChildOfClass("Humanoid"); if hum then hum.PlatformStand=true end
+	flyBody=Instance.new("BodyVelocity"); flyBody.Velocity=Vector3.zero; flyBody.MaxForce=Vector3.new(1e5,1e5,1e5); flyBody.Parent=HRP
+	flyGyro=Instance.new("BodyGyro"); flyGyro.MaxTorque=Vector3.new(1e5,1e5,1e5); flyGyro.P=1e4; flyGyro.CFrame=HRP.CFrame; flyGyro.Parent=HRP
+	flyConn=RunService.Heartbeat:Connect(function()
+		if not flyEnabled then return end; if not HRP or not HRP.Parent then stopFly(); return end
+		local cf=workspace.CurrentCamera.CFrame; local md=Vector3.zero
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then md=md+cf.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then md=md-cf.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then md=md-cf.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then md=md+cf.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then md=md+Vector3.new(0,1,0) end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then md=md-Vector3.new(0,1,0) end
+		flyBody.Velocity=md.Magnitude>0 and md.Unit*FLY_SPEED or Vector3.zero; flyGyro.CFrame=cf
 	end)
 end
-Player.CharacterAdded:Connect(function(char)
-	Character=char; HRP=char:WaitForChild("HumanoidRootPart")
-	if flyEnabled then task.wait(0.5); startFly() end
-end)
+Player.CharacterAdded:Connect(function() if flyEnabled then task.wait(0.5); startFly() end end)
 
 local noclipEnabled,noclipConn=false,nil
 local function setNoclip(v)
@@ -348,9 +314,9 @@ task.wait(0.1)
 local mob = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
 -- SIZE — matches standalone file
-local GW  = mob and 445 or 720
+local GW  = mob and 600 or 820
 local GH  = mob and 360 or 490
-local SW  = mob and 150 or 180
+local SW  = mob and 170 or 200
 local CPad = mob and 10 or 14
 local LS  = mob and 11 or 13
 local HH  = mob and 40 or 44
@@ -528,7 +494,7 @@ local function addCard(page,order)
 	newI("UIListLayout",card,{Padding=UDim.new(0,4),SortOrder=Enum.SortOrder.LayoutOrder}); return card
 end
 
--- TOGGLE
+-- TOGGLE — bigger pill + larger invisible hit area on mobile
 local function addToggle(card,labelText,descText,defaultOn,order,cb)
 	local rowH = mob and 46 or 44
 	local row=newI("Frame",card,{Size=UDim2.new(1,0,0,rowH),BackgroundTransparency=1,LayoutOrder=order or 1})
@@ -539,9 +505,10 @@ local function addToggle(card,labelText,descText,defaultOn,order,cb)
 	local knobS = mob and 20 or 14
 	local pill=newI("Frame",row,{Name="Pill",Size=UDim2.new(0,pillW,0,pillH),Position=UDim2.new(1,-(pillW+6),0.5,-(pillH/2)),BackgroundColor3=defaultOn and ct.acc1 or ct.bg3,BorderSizePixel=0}); corner(pill,pillH/2)
 	local knob=newI("Frame",pill,{Size=UDim2.new(0,knobS,0,knobS),Position=defaultOn and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2)),BackgroundColor3=Color3.new(1,1,1),BorderSizePixel=0,ZIndex=3}); corner(knob,knobS/2)
+	-- large invisible hit zone so finger doesn't have to be precise
 	local hitW = mob and 70 or pillW+10
 	local hitH = mob and rowH or pillH+10
-	local hit=newI("Frame",row,{Size=UDim2.new(0,hitW,0,hitH),Position=UDim2.new(1,-hitW-2,0.5,-(hitH/2)),BackgroundTransparency=1,ZIndex=5})
+	local hit=newI("TextButton",row,{Size=UDim2.new(0,hitW,0,hitH),Position=UDim2.new(1,-hitW-2,0.5,-(hitH/2)),BackgroundTransparency=1,Text="",ZIndex=5})
 	local state=defaultOn or false
 	local function toggle()
 		state=not state
@@ -549,13 +516,7 @@ local function addToggle(card,labelText,descText,defaultOn,order,cb)
 		tw(knob,{Position=state and UDim2.new(1,-(knobS+3),0.5,-(knobS/2)) or UDim2.new(0,3,0.5,-(knobS/2))},0.18)
 		if cb then cb(state) end
 	end
-	hit.InputBegan:Connect(function(i)
-		if mob then
-			if i.UserInputType == Enum.UserInputType.Touch then toggle() end
-		else
-			if i.UserInputType == Enum.UserInputType.MouseButton1 then toggle() end
-		end
-	end)
+	safeTap(hit, toggle)
 end
 
 -- SLIDER
