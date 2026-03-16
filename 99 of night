@@ -499,18 +499,28 @@ local function addDropdown(card,labelText,options,order,cb)
 	local lf=newI("ScrollingFrame",sg,{Size=UDim2.new(0,10,0,10),BackgroundColor3=ct.bg0,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=ct.acc1,CanvasSize=UDim2.new(0,0,0,totalH),Visible=false,ZIndex=200,ClipsDescendants=true}); corner(lf,6)
 	newI("UIStroke",lf,{Color=ct.acc1,Thickness=1.5,Transparency=0.3}); newI("UIPadding",lf,{PaddingTop=UDim.new(0,4),PaddingBottom=UDim.new(0,4),PaddingLeft=UDim.new(0,4),PaddingRight=UDim.new(0,4)}); newI("UIListLayout",lf,{Padding=UDim.new(0,2),SortOrder=Enum.SortOrder.LayoutOrder})
 	local blocker=newI("TextButton",sg,{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=199,Visible=false,AutoButtonColor=false})
+	local justOpened=false
 	local function closeList() lf.Visible=false; blocker.Visible=false end
-	local function openList() local bp=sel.AbsolutePosition; local bs=sel.AbsoluteSize; lf.Size=UDim2.new(0,math.max(bs.X,mob and 200 or 160),0,listH); lf.Position=UDim2.new(0,bp.X,0,bp.Y+bs.Y+2); blocker.Visible=true; lf.Visible=true end
+	local function openList()
+		local bp=sel.AbsolutePosition; local bs=sel.AbsoluteSize
+		lf.Size=UDim2.new(0,math.max(bs.X,mob and 200 or 160),0,listH)
+		lf.Position=UDim2.new(0,bp.X,0,bp.Y+bs.Y+2)
+		blocker.Visible=true; lf.Visible=true
+		justOpened=true
+		task.delay(0.2, function() justOpened=false end)
+	end
 	for i,opt in ipairs(options) do
 		local ob=newI("TextButton",lf,{Name="opt_"..i,Size=UDim2.new(1,0,0,itemH-2),BackgroundColor3=ct.bg2,BorderSizePixel=0,Text=opt,Font=Enum.Font.Gotham,TextSize=LS,TextColor3=ct.text0,AutoButtonColor=false,ZIndex=201}); corner(ob,5)
 		local cap=opt
-		ob.MouseButton1Click:Connect(function() sel.Text=cap.."  ▾"; sel.TextColor3=ct.acc1; closeList(); if cb then cb(cap) end end)
-		ob.TouchTap:Connect(function() sel.Text=cap.."  ▾"; sel.TextColor3=ct.acc1; closeList(); if cb then cb(cap) end end)
+		local function pick() sel.Text=cap.."  ▾"; sel.TextColor3=ct.acc1; closeList(); if cb then cb(cap) end end
+		ob.MouseButton1Click:Connect(pick)
+		ob.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch then pick() end end)
 		ob.MouseEnter:Connect(function() ob.BackgroundColor3=ct.surface end); ob.MouseLeave:Connect(function() ob.BackgroundColor3=ct.bg2 end)
 	end
-	blocker.MouseButton1Click:Connect(closeList); blocker.TouchTap:Connect(closeList)
+	blocker.MouseButton1Click:Connect(function() if not justOpened then closeList() end end)
+	blocker.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch and not justOpened then closeList() end end)
 	sel.MouseButton1Click:Connect(function() if lf.Visible then closeList() else openList() end end)
-	sel.TouchTap:Connect(function() if lf.Visible then closeList() else openList() end end)
+	sel.InputBegan:Connect(function(i) if i.UserInputType==Enum.UserInputType.Touch then if lf.Visible then closeList() else openList() end end end)
 	return sel
 end
 
