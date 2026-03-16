@@ -314,7 +314,7 @@ task.wait(0.1)
 local mob = UIS.TouchEnabled and not UIS.KeyboardEnabled
 
 -- SIZE — matches standalone file
-local GW  = mob and 445 or 720
+local GW  = mob and 500 or 720
 local GH  = mob and 360 or 490
 local SW  = mob and 150 or 180
 local CPad = mob and 10 or 14
