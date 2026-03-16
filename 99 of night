@@ -2,6 +2,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -9,78 +10,92 @@ local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
 local flying = false
-local flySpeed = 50
+local flySpeed = 60
 local bodyVelocity = nil
 local bodyGyro = nil
 
--- Mobile GUI
+-- GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "FlyGui"
 screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
 -- Fly toggle button
 local flyBtn = Instance.new("TextButton")
-flyBtn.Size = UDim2.new(0, 80, 0, 80)
-flyBtn.Position = UDim2.new(1, -100, 1, -180)
+flyBtn.Size = UDim2.new(0, 75, 0, 75)
+flyBtn.Position = UDim2.new(1, -95, 1, -170)
 flyBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
 flyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 flyBtn.Text = "FLY"
-flyBtn.TextSize = 18
+flyBtn.TextSize = 16
 flyBtn.Font = Enum.Font.GothamBold
 flyBtn.BorderSizePixel = 0
+flyBtn.ZIndex = 10
 flyBtn.Parent = screenGui
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(1, 0)
-corner.Parent = flyBtn
+Instance.new("UICorner").CornerRadius = UDim.new(1, 0)
+local fc = Instance.new("UICorner")
+fc.CornerRadius = UDim.new(1, 0)
+fc.Parent = flyBtn
 
 -- Up button
 local upBtn = Instance.new("TextButton")
 upBtn.Size = UDim2.new(0, 60, 0, 60)
-upBtn.Position = UDim2.new(1, -170, 1, -190)
-upBtn.BackgroundColor3 = Color3.fromRGB(50, 100, 255)
+upBtn.Position = UDim2.new(1, -175, 1, -175)
+upBtn.BackgroundColor3 = Color3.fromRGB(50, 120, 255)
 upBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 upBtn.Text = "▲"
-upBtn.TextSize = 22
+upBtn.TextSize = 24
 upBtn.Font = Enum.Font.GothamBold
 upBtn.BorderSizePixel = 0
 upBtn.Visible = false
+upBtn.ZIndex = 10
 upBtn.Parent = screenGui
 
-local upCorner = Instance.new("UICorner")
-upCorner.CornerRadius = UDim.new(1, 0)
-upCorner.Parent = upBtn
+local uc = Instance.new("UICorner")
+uc.CornerRadius = UDim.new(1, 0)
+uc.Parent = upBtn
 
 -- Down button
 local downBtn = Instance.new("TextButton")
 downBtn.Size = UDim2.new(0, 60, 0, 60)
-downBtn.Position = UDim2.new(1, -170, 1, -120)
-downBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+downBtn.Position = UDim2.new(1, -175, 1, -105)
+downBtn.BackgroundColor3 = Color3.fromRGB(255, 70, 70)
 downBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 downBtn.Text = "▼"
-downBtn.TextSize = 22
+downBtn.TextSize = 24
 downBtn.Font = Enum.Font.GothamBold
 downBtn.BorderSizePixel = 0
 downBtn.Visible = false
+downBtn.ZIndex = 10
 downBtn.Parent = screenGui
 
-local downCorner = Instance.new("UICorner")
-downCorner.CornerRadius = UDim.new(1, 0)
-downCorner.Parent = downBtn
+local dc = Instance.new("UICorner")
+dc.CornerRadius = UDim.new(1, 0)
+dc.Parent = downBtn
 
 local goingUp = false
 local goingDown = false
 
--- Fixed button listeners
+-- Detect touch on up/down buttons properly
 upBtn.MouseButton1Down:Connect(function() goingUp = true end)
 upBtn.MouseButton1Up:Connect(function() goingUp = false end)
+upBtn.MouseLeave:Connect(function() goingUp = false end)
+
 downBtn.MouseButton1Down:Connect(function() goingDown = true end)
 downBtn.MouseButton1Up:Connect(function() goingDown = false end)
+downBtn.MouseLeave:Connect(function() goingDown = false end)
+
+-- Also handle actual touch input for mobile
+UserInputService.TouchEnded:Connect(function()
+    goingUp = false
+    goingDown = false
+end)
 
 local function startFly()
     flying = true
-    flyBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 100)
+    flyBtn.BackgroundColor3 = Color3.fromRGB(40, 200, 90)
     flyBtn.Text = "LAND"
     upBtn.Visible = true
     downBtn.Visible = true
@@ -94,7 +109,8 @@ local function startFly()
 
     bodyGyro = Instance.new("BodyGyro")
     bodyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-    bodyGyro.D = 100
+    bodyGyro.D = 150
+    bodyGyro.P = 10000
     bodyGyro.Parent = rootPart
 end
 
@@ -114,11 +130,7 @@ local function stopFly()
 end
 
 flyBtn.MouseButton1Click:Connect(function()
-    if flying then
-        stopFly()
-    else
-        startFly()
-    end
+    if flying then stopFly() else startFly() end
 end)
 
 -- Main fly loop
@@ -127,14 +139,19 @@ RunService.Heartbeat:Connect(function()
     if not rootPart or not bodyVelocity or not bodyGyro then return end
 
     local camera = workspace.CurrentCamera
+
+    -- Use humanoid.MoveDirection which works with the on-screen joystick on mobile
     local moveVector = humanoid.MoveDirection
     local moveDir = Vector3.zero
 
-    if moveVector.Magnitude > 0.1 then
-        local camCFrame = camera.CFrame
-        local flatForward = Vector3.new(camCFrame.LookVector.X, 0, camCFrame.LookVector.Z).Unit
-        local flatRight = Vector3.new(camCFrame.RightVector.X, 0, camCFrame.RightVector.Z).Unit
-        moveDir = (flatForward * moveVector.Z * -1 + flatRight * moveVector.X)
+    if moveVector.Magnitude > 0.01 then
+        -- Move relative to camera direction so it feels natural
+        local camYaw = CFrame.Angles(0, math.atan2(-camera.CFrame.LookVector.X, -camera.CFrame.LookVector.Z), 0)
+        local localMove = camYaw * Vector3.new(moveVector.X, 0, moveVector.Z)
+        moveDir = Vector3.new(localMove.X, 0, localMove.Z)
+        if moveDir.Magnitude > 1 then
+            moveDir = moveDir.Unit
+        end
     end
 
     local verticalDir = Vector3.zero
@@ -144,19 +161,17 @@ RunService.Heartbeat:Connect(function()
         verticalDir = Vector3.new(0, -1, 0)
     end
 
-    local finalVelocity = (moveDir + verticalDir)
-    if finalVelocity.Magnitude > 1 then
-        finalVelocity = finalVelocity.Unit
-    end
+    local finalVelocity = moveDir * flySpeed + verticalDir * flySpeed
 
-    bodyVelocity.Velocity = finalVelocity * flySpeed
+    bodyVelocity.Velocity = finalVelocity
 
+    -- Rotate character to face movement direction smoothly
     if moveDir.Magnitude > 0.1 then
-        bodyGyro.CFrame = CFrame.lookAt(Vector3.zero, moveDir)
+        bodyGyro.CFrame = CFrame.new(Vector3.zero, moveDir)
     end
 end)
 
--- Clean up on character respawn
+-- Respawn handler
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
     humanoid = newChar:WaitForChild("Humanoid")
