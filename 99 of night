@@ -2,7 +2,6 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -73,11 +72,11 @@ downCorner.Parent = downBtn
 local goingUp = false
 local goingDown = false
 
--- Up/Down button listeners
-upBtn.TouchStarted:Connect(function() goingUp = true end)
-upBtn.TouchEnded:Connect(function() goingUp = false end)
-downBtn.TouchStarted:Connect(function() goingDown = true end)
-downBtn.TouchEnded:Connect(function() goingDown = false end)
+-- Fixed button listeners
+upBtn.MouseButton1Down:Connect(function() goingUp = true end)
+upBtn.MouseButton1Up:Connect(function() goingUp = false end)
+downBtn.MouseButton1Down:Connect(function() goingDown = true end)
+downBtn.MouseButton1Up:Connect(function() goingDown = false end)
 
 local function startFly()
     flying = true
@@ -128,11 +127,8 @@ RunService.Heartbeat:Connect(function()
     if not rootPart or not bodyVelocity or not bodyGyro then return end
 
     local camera = workspace.CurrentCamera
-    local moveDir = Vector3.zero
-
-    -- Get movement from thumbstick (mobile)
-    local thumbstick = UserInputService:GetNavigatorState()
     local moveVector = humanoid.MoveDirection
+    local moveDir = Vector3.zero
 
     if moveVector.Magnitude > 0.1 then
         local camCFrame = camera.CFrame
@@ -155,7 +151,6 @@ RunService.Heartbeat:Connect(function()
 
     bodyVelocity.Velocity = finalVelocity * flySpeed
 
-    -- Rotate to face movement direction
     if moveDir.Magnitude > 0.1 then
         bodyGyro.CFrame = CFrame.lookAt(Vector3.zero, moveDir)
     end
