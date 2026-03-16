@@ -316,7 +316,7 @@ local mob = UIS.TouchEnabled and not UIS.KeyboardEnabled
 -- SIZE — matches standalone file
 local GW  = mob and 600 or 820
 local GH  = mob and 360 or 490
-local SW  = mob and 150 or 180
+local SW  = mob and 170 or 200
 local CPad = mob and 10 or 14
 local LS  = mob and 11 or 13
 local HH  = mob and 40 or 44
