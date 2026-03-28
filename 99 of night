@@ -1,3 +1,4 @@
+
 -- CK's Hub v2.2 — Full Game Logic Build
 local Players,UIS,TS,RS,CS,RunService=game:GetService("Players"),game:GetService("UserInputService"),game:GetService("TweenService"),game:GetService("ReplicatedStorage"),game:GetService("CollectionService"),game:GetService("RunService")
 local P,pGui=Players.LocalPlayer,Players.LocalPlayer:WaitForChild("PlayerGui")
@@ -105,7 +106,7 @@ UIS.JumpRequest:Connect(function() if infJump then local c=P.Character if c then
 -- ===================== CK'S HUB GUI =====================
 local mob=UIS.TouchEnabled and not UIS.KeyboardEnabled
 local GF,TX,DM,WH={t=Enum.Font.FredokaOne,b=Enum.Font.GothamSemibold,d=Enum.Font.Gotham},Color3.fromRGB(235,235,240),Color3.fromRGB(120,120,138),Color3.new(1,1,1)
-local GW,GH,SW,TH,EH,FS=mob and 400 or 460,mob and 360 or 420,mob and 115 or 145,mob and 54 or 52,mob and 36 or 38,mob and 14 or 13
+local GW,GH,SW,TH,EH,FS=mob and 460 or 500,mob and 360 or 420,mob and 115 or 145,mob and 54 or 52,mob and 36 or 38,mob and 14 or 13
 
 local function safeFont(name,fallback) local ok,f=pcall(function() return Enum.Font[name] end) if ok and f then return f end return fallback or Enum.Font.FredokaOne end
 local titleFont=safeFont("PermanentMarker",Enum.Font.FredokaOne)
