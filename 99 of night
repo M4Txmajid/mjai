@@ -109,9 +109,9 @@ local GF,TX,DM,WH={t=Enum.Font.FredokaOne,b=Enum.Font.GothamSemibold,d=Enum.Font
 
 -- ===================== GUI SIZE SETTINGS =====================
 -- Edit the MOBILE values below (left number = mobile, right number = PC)
-local MOB_WIDTH        = 480  -- GUI width on mobile
+local MOB_WIDTH        = 580  -- GUI width on mobile
 local MOB_HEIGHT       = 420  -- GUI height on mobile
-local MOB_SIDEBAR      = 95  -- Sidebar width on mobile
+local MOB_SIDEBAR      = 85  -- Sidebar width on mobile
 local MOB_HEADER       = 54   -- Header/title bar height on mobile
 local MOB_ELEM_HEIGHT  = 30   -- Button/toggle/slider height on mobile
 local MOB_FONT_SIZE    = 14   -- Font size on mobile
