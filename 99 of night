@@ -1,1 +1,369 @@
--- MD's Hub GUI Framework v2.2 — Mobile-Safe Build local Players,UIS,TS=game:GetService("Players"),game:GetService("UserInputService"),game:GetService("TweenService") local P,pGui=Players.LocalPlayer,Players.LocalPlayer:WaitForChild("PlayerGui") for _,v in pairs(pGui:GetChildren()) do if v.Name=="CKHub" then v:Destroy() end end task.wait(.1) local mob=UIS.TouchEnabled and not UIS.KeyboardEnabled local GF,TX,DM,WH={t=Enum.Font.FredokaOne,b=Enum.Font.GothamSemibold,d=Enum.Font.Gotham},Color3.fromRGB(235,235,240),Color3.fromRGB(120,120,138),Color3.new(1,1,1) local GW,GH,SW,TH,EH,FS=mob and 420 or 580,mob and 420 or 480,mob and 115 or 145,mob and 54 or 52,mob and 44 or 42,mob and 14 or 13 -- ★ SAFE FONT LOADING (prevents crash on mobile executors) local function safeFont(name,fallback) local ok,f=pcall(function() return Enum.Font[name] end) if ok and f then return f end return fallback or Enum.Font.FredokaOne end local titleFont=safeFont("PermanentMarker",Enum.Font.FredokaOne) local medFont=safeFont("GothamMedium",Enum.Font.Gotham) local boldFont=safeFont("GothamBold",Enum.Font.GothamSemibold) local Th={ P={a=Color3.fromRGB(160,80,240),ad=Color3.fromRGB(110,50,190),b1=Color3.fromRGB(14,10,22),b2=Color3.fromRGB(20,14,30),b3=Color3.fromRGB(28,18,42),e=Color3.fromRGB(36,22,52),br=Color3.fromRGB(50,30,70),mg={Color3.fromRGB(160,80,240),Color3.fromRGB(180,110,255),Color3.fromRGB(200,150,255),Color3.fromRGB(220,190,255),Color3.fromRGB(200,150,255),Color3.fromRGB(180,110,255)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(210,170,255),Color3.fromRGB(185,130,255),Color3.fromRGB(160,80,240),Color3.fromRGB(185,130,255),Color3.fromRGB(210,170,255)},ts={Color3.fromRGB(200,150,255),Color3.fromRGB(220,180,255),Color3.fromRGB(170,110,240),Color3.fromRGB(240,210,255)}}, B={a=Color3.fromRGB(90,120,255),ad=Color3.fromRGB(60,90,200),b1=Color3.fromRGB(15,15,20),b2=Color3.fromRGB(22,22,28),b3=Color3.fromRGB(30,30,38),e=Color3.fromRGB(40,40,45),br=Color3.fromRGB(48,48,60),mg={Color3.fromRGB(90,120,255),Color3.fromRGB(120,160,255),Color3.fromRGB(160,200,255),Color3.fromRGB(200,230,255),Color3.fromRGB(160,200,255),Color3.fromRGB(120,160,255)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(180,210,255),Color3.fromRGB(140,185,255),Color3.fromRGB(100,160,255),Color3.fromRGB(140,185,255),Color3.fromRGB(180,210,255)},ts={Color3.fromRGB(140,200,255),Color3.fromRGB(180,220,255),Color3.fromRGB(100,180,255),Color3.fromRGB(200,235,255)}}, R={a=Color3.fromRGB(220,50,50),ad=Color3.fromRGB(170,30,30),b1=Color3.fromRGB(20,12,12),b2=Color3.fromRGB(28,16,16),b3=Color3.fromRGB(38,22,22),e=Color3.fromRGB(45,28,28),br=Color3.fromRGB(60,35,35),mg={Color3.fromRGB(220,50,50),Color3.fromRGB(240,80,80),Color3.fromRGB(255,120,120),Color3.fromRGB(255,160,160),Color3.fromRGB(255,120,120),Color3.fromRGB(240,80,80)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(255,180,180),Color3.fromRGB(255,140,140),Color3.fromRGB(220,80,80),Color3.fromRGB(255,140,140),Color3.fromRGB(255,180,180)},ts={Color3.fromRGB(255,140,140),Color3.fromRGB(255,180,180),Color3.fromRGB(220,100,100),Color3.fromRGB(255,200,200)}}, G={a=Color3.fromRGB(50,200,100),ad=Color3.fromRGB(30,150,70),b1=Color3.fromRGB(10,18,14),b2=Color3.fromRGB(14,24,18),b3=Color3.fromRGB(18,32,24),e=Color3.fromRGB(22,40,30),br=Color3.fromRGB(30,55,40),mg={Color3.fromRGB(50,200,100),Color3.fromRGB(80,220,120),Color3.fromRGB(120,240,160),Color3.fromRGB(160,255,200),Color3.fromRGB(120,240,160),Color3.fromRGB(80,220,120)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(160,255,190),Color3.fromRGB(100,230,140),Color3.fromRGB(50,200,100),Color3.fromRGB(100,230,140),Color3.fromRGB(160,255,190)},ts={Color3.fromRGB(120,240,160),Color3.fromRGB(160,255,200),Color3.fromRGB(80,210,130),Color3.fromRGB(200,255,220)}}, O={a=Color3.fromRGB(255,140,30),ad=Color3.fromRGB(200,100,10),b1=Color3.fromRGB(20,14,8),b2=Color3.fromRGB(28,20,10),b3=Color3.fromRGB(38,28,14),e=Color3.fromRGB(48,34,16),br=Color3.fromRGB(65,46,20),mg={Color3.fromRGB(255,140,30),Color3.fromRGB(255,165,60),Color3.fromRGB(255,195,100),Color3.fromRGB(255,220,150),Color3.fromRGB(255,195,100),Color3.fromRGB(255,165,60)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(255,210,140),Color3.fromRGB(255,175,80),Color3.fromRGB(230,130,30),Color3.fromRGB(255,175,80),Color3.fromRGB(255,210,140)},ts={Color3.fromRGB(255,190,100),Color3.fromRGB(255,215,140),Color3.fromRGB(240,160,60),Color3.fromRGB(255,230,170)}}, C={a=Color3.fromRGB(0,210,230),ad=Color3.fromRGB(0,160,180),b1=Color3.fromRGB(8,18,22),b2=Color3.fromRGB(10,24,30),b3=Color3.fromRGB(14,32,40),e=Color3.fromRGB(16,40,50),br=Color3.fromRGB(22,55,68),mg={Color3.fromRGB(0,210,230),Color3.fromRGB(40,225,240),Color3.fromRGB(100,240,250),Color3.fromRGB(160,250,255),Color3.fromRGB(100,240,250),Color3.fromRGB(40,225,240)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(160,245,255),Color3.fromRGB(80,230,248),Color3.fromRGB(0,200,225),Color3.fromRGB(80,230,248),Color3.fromRGB(160,245,255)},ts={Color3.fromRGB(100,235,250),Color3.fromRGB(150,245,255),Color3.fromRGB(50,215,235),Color3.fromRGB(190,252,255)}}, K={a=Color3.fromRGB(240,80,180),ad=Color3.fromRGB(190,50,140),b1=Color3.fromRGB(22,10,18),b2=Color3.fromRGB(30,14,24),b3=Color3.fromRGB(40,18,32),e=Color3.fromRGB(50,22,40),br=Color3.fromRGB(68,30,55),mg={Color3.fromRGB(240,80,180),Color3.fromRGB(250,110,200),Color3.fromRGB(255,150,220),Color3.fromRGB(255,190,235),Color3.fromRGB(255,150,220),Color3.fromRGB(250,110,200)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(255,190,230),Color3.fromRGB(255,145,215),Color3.fromRGB(235,75,175),Color3.fromRGB(255,145,215),Color3.fromRGB(255,190,230)},ts={Color3.fromRGB(255,150,215),Color3.fromRGB(255,185,232),Color3.fromRGB(235,100,190),Color3.fromRGB(255,210,245)}} } local C,Reg,shT,adc,mnG,mdL,huL,mdT,huT={},{{},{},{},{},{},{},{},{}},{},nil,nil,nil,nil,nil,nil for k,v in pairs(Th.P) do C[k]=v end -- ★ ALIVE CHECK (prevents orphaned loops) local guiAlive=true local function tw(o,d,p) TS:Create(o,TweenInfo.new(d),p):Play() end local function ni(c,p,r) local o=Instance.new(c) for k,v in pairs(p or{}) do o[k]=v end if r then o.Parent=r end return o end local function cr(o,r) ni("UICorner",{CornerRadius=UDim.new(0,r or 6)},o) end local function rk(i,o) table.insert(Reg[i],o) return o end local function sCS(t) return ColorSequence.new({ColorSequenceKeypoint.new(0,t.a),ColorSequenceKeypoint.new(.15,t.br),ColorSequenceKeypoint.new(.42,t.ad),ColorSequenceKeypoint.new(.48,t.mg[3]),ColorSequenceKeypoint.new(.5,t.mg[4]),ColorSequenceKeypoint.new(.52,t.mg[3]),ColorSequenceKeypoint.new(.58,t.ad),ColorSequenceKeypoint.new(.85,t.br),ColorSequenceKeypoint.new(1,t.a)}) end local function glow(o,g,d,w) local i=1 while guiAlive and o and o.Parent do tw(o,d or.5,{TextColor3=g[i]}) task.wait(w or.6) i=i%#g+1 end end local function aT(t) for k,v in pairs(t) do C[k]=v end for _,o in pairs(Reg[1]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.b1}) end end for _,o in pairs(Reg[2]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.b2}) end end for _,o in pairs(Reg[3]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.b3}) end end for _,o in pairs(Reg[4]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.e}) end end for _,o in pairs(Reg[5]) do if o and o.Parent then if o:IsA("UIStroke") then tw(o,.35,{Color=t.br}) else tw(o,.35,{BackgroundColor3=t.br}) end end end for _,o in pairs(Reg[6]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.a}) end end for _,o in pairs(Reg[7]) do if o and o.Parent then tw(o,.35,{Color=t.a}) end end for _,o in pairs(Reg[8]) do if o and o.Parent then o.ScrollBarImageColor3=t.a end end if mnG then mnG.Color=sCS(t) end if mdT then task.cancel(mdT) end mdT=task.spawn(glow,mdL,t.mg,.6,.7) if huT then task.cancel(huT) end huT=task.spawn(function() task.wait(.35) glow(huL,t.hg,.6,.7) end) for _,v in pairs(shT) do if v.on then if v.th then task.cancel(v.th) end v.th=task.spawn(function() local i=1 while guiAlive do tw(v.ic,.4,{TextColor3=t.ts[i]}) tw(v.nm,.4,{TextColor3=t.ts[i]}) task.wait(.5) i=i%#t.ts+1 end end) end end end local sg=ni("ScreenGui",{Name="CKHub",ResetOnSpawn=false},pGui) -- ★ KILL SWITCH: stop all loops when GUI destroyed sg.Destroying:Connect(function() guiAlive=false end) local mn=rk(1,ni("Frame",{Size=UDim2.new(0,GW,0,GH),Position=UDim2.new(.5,-GW/2,.5,-GH/2),BackgroundColor3=C.b1,BorderSizePixel=0,ClipsDescendants=true},sg)) cr(mn,12) local mnS=ni("UIStroke",{Thickness=1.5,Transparency=.08,Color=WH,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},mn) mnG=ni("UIGradient",{Color=sCS(C),Rotation=0},mnS) task.spawn(function() while guiAlive and mn and mn.Parent do mnG.Rotation=0 TS:Create(mnG,TweenInfo.new(3.5,Enum.EasingStyle.Linear),{Rotation=360}):Play() task.wait(3.5) end end) local hdr=rk(2,ni("Frame",{Size=UDim2.new(1,0,0,TH),BackgroundColor3=C.b2,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=5},mn)) cr(hdr,12) rk(5,ni("Frame",{Size=UDim2.new(1,0,0,1),Position=UDim2.new(0,0,0,TH),BackgroundColor3=C.br,BorderSizePixel=0,ZIndex=5},mn)) -- ★ TITLE: "MD's Hub" + subtitle "99 nights" (safe fonts) local tf=ni("Frame",{Size=UDim2.new(0,260,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,ZIndex=6},hdr) mdL=ni("TextLabel",{Size=UDim2.new(0,62,0,26),Position=UDim2.new(0,0,0,3),BackgroundTransparency=1,Text="CK's",TextColor3=C.a,TextSize=mob and 20 or 19,Font=titleFont,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},tf) huL=ni("TextLabel",{Size=UDim2.new(0,55,0,26),Position=UDim2.new(0,52,0,3),BackgroundTransparency=1,Text="Hub",TextColor3=TX,TextSize=mob and 20 or 19,Font=titleFont,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},tf) local subL=ni("TextLabel",{Size=UDim2.new(0,120,0,16),Position=UDim2.new(0,1,0,28),BackgroundTransparency=1,Text="99 nights",TextColor3=DM,TextSize=mob and 11 or 10,Font=medFont,TextXAlignment=Enum.TextXAlignment.Left,TextTransparency=.2,ZIndex=6},tf) local dotL=ni("TextLabel",{Size=UDim2.new(0,10,0,16),Position=UDim2.new(0,64,0,28),BackgroundTransparency=1,Text="·",TextColor3=C.a,TextSize=12,Font=boldFont,TextTransparency=.3,ZIndex=6},tf) mdT=task.spawn(glow,mdL,C.mg,.6,.7) huT=task.spawn(function() task.wait(.35) glow(huL,C.hg,.6,.7) end) task.spawn(function() while guiAlive and subL and subL.Parent do tw(subL,.8,{TextColor3=C.a,TextTransparency=.3}) task.wait(1.2) tw(subL,.8,{TextColor3=DM,TextTransparency=.2}) task.wait(1.2) end end) -- ★ BIGGER TOUCH TARGETS for mobile (38px vs 30px) local function mkBtn(off,hc) local s=mob and 38 or 30 local b=ni("TextButton",{Size=UDim2.new(0,s,0,s),Position=UDim2.new(1,off,.5,-s/2),BackgroundTransparency=1,BackgroundColor3=C.b3,Text="",ZIndex=7},hdr) cr(b,7) b.MouseEnter:Connect(function() tw(b,.12,{BackgroundTransparency=0,BackgroundColor3=hc}) end) b.MouseLeave:Connect(function() tw(b,.12,{BackgroundTransparency=1}) end) return b end local function mkL(p,r,s) local l=ni("Frame",{Size=UDim2.new(0,s or 14,0,2),AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,0),BackgroundColor3=DM,BorderSizePixel=0,Rotation=r or 0,ZIndex=8},p) cr(l,2) return l end local cbtn,mbtn=mkBtn(mob and-44 or-36,Color3.fromRGB(200,55,55)),mkBtn(mob and-88 or-72,C.b3) local x1,x2=mkL(cbtn,45),mkL(cbtn,-45) cbtn.MouseEnter:Connect(function() tw(x1,.12,{BackgroundColor3=WH}) tw(x2,.12,{BackgroundColor3=WH}) end) cbtn.MouseLeave:Connect(function() tw(x1,.12,{BackgroundColor3=DM}) tw(x2,.12,{BackgroundColor3=DM}) end) local mln=mkL(mbtn,0) mbtn.MouseEnter:Connect(function() tw(mln,.12,{BackgroundColor3=WH}) end) mbtn.MouseLeave:Connect(function() tw(mln,.12,{BackgroundColor3=DM}) end) local floatBtn=rk(6,ni("TextButton",{Size=UDim2.new(0,56,0,56),Position=UDim2.new(0,20,.5,-28),BackgroundColor3=C.a,BorderSizePixel=0,Text="",ZIndex=200,Visible=false},sg)) cr(floatBtn,28) ni("UIStroke",{Color=C.a,Thickness=2,Transparency=.3},floatBtn) local floatImg=ni("ImageLabel",{Size=UDim2.new(0,40,0,40),AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,0),BackgroundTransparency=1,Image="rbxassetid://119539782854133",ScaleType=Enum.ScaleType.Fit,ZIndex=201},floatBtn) cr(floatImg,20) local sd=rk(2,ni("Frame",{Size=UDim2.new(0,SW,1,0),BackgroundColor3=C.b2,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=3},mn)) cr(sd,12) rk(5,ni("Frame",{Size=UDim2.new(0,1,1,-(TH+1)),Position=UDim2.new(0,SW,0,TH+1),BackgroundColor3=C.br,BorderSizePixel=0,ZIndex=3},mn)) local sdScr=ni("ScrollingFrame",{Size=UDim2.new(1,0,1,-(TH+11)),Position=UDim2.new(0,0,0,TH+11),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=0,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(0,0,0,0),ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true},sd) ni("UIListLayout",{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,3)},sdScr) ni("UIPadding",{PaddingTop=UDim.new(0,4),PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingBottom=UDim.new(0,8)},sdScr) local ctArea=ni("Frame",{Size=UDim2.new(1,-(SW+1),1,-(TH+1)),Position=UDim2.new(0,SW+1,0,TH+1),BackgroundTransparency=1,BorderSizePixel=0,ZIndex=2,ClipsDescendants=true},mn) local ov=ni("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=50},mn) local pc=ni("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=2,ClipsDescendants=false},ctArea) local ctBg=ni("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=C.b1,BackgroundTransparency=.6,BorderSizePixel=0,ZIndex=1},ctArea) cr(ctBg,0) ni("UIGradient",{Rotation=145,Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.85),NumberSequenceKeypoint.new(.5,.95),NumberSequenceKeypoint.new(1,.98)})},ctBg) -- TAB SYSTEM local tl,pgs,tb,cur={{"Hub","H"},{"Config","G"}},{},{},nil for i,v in ipairs(tl) do local nm,ic=v[1],v[2] local pg=rk(8,ni("ScrollingFrame",{Name=nm,Size=UDim2.new(1,-16,1,-8),Position=UDim2.new(0,6,0,6),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=C.a,Visible=false,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(0,0,0,0),ZIndex=2,ClipsDescendants=false},pc)) ni("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},pg) ni("UIPadding",{PaddingTop=UDim.new(0,6),PaddingRight=UDim.new(0,12),PaddingLeft=UDim.new(0,4),PaddingBottom=UDim.new(0,14)},pg) pgs[nm]=pg local b=ni("TextButton",{Size=UDim2.new(1,0,0,mob and 40 or 32),BackgroundColor3=C.e,BackgroundTransparency=1,Text="",LayoutOrder=i,ZIndex=4},sdScr) cr(b,6) local bar=rk(6,ni("Frame",{Size=UDim2.new(0,3,1,-10),Position=UDim2.new(0,0,0,5),BackgroundColor3=C.a,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=5},b)) cr(bar,2) local ibg=rk(3,ni("Frame",{Size=UDim2.new(0,20,0,20),Position=UDim2.new(0,8,.5,-10),BackgroundColor3=C.b3,BackgroundTransparency=.5,BorderSizePixel=0,ZIndex=5},b)) cr(ibg,10) local tic=ni("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=ic,TextColor3=DM,TextSize=FS-1,Font=GF.t,ZIndex=6},ibg) local tnm=ni("TextLabel",{Size=UDim2.new(1,-38,1,0),Position=UDim2.new(0,34,0,0),BackgroundTransparency=1,Text=nm,TextColor3=DM,TextSize=FS,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},b) shT[nm]={on=false,th=nil,ic=tic,nm=tnm} local function ss() shT[nm].on=true if shT[nm].th then task.cancel(shT[nm].th) end shT[nm].th=task.spawn(function() local idx=1 while guiAlive do tw(tic,.4,{TextColor3=C.ts[idx]}) tw(tnm,.4,{TextColor3=C.ts[idx]}) task.wait(.5) idx=idx%#C.ts+1 end end) end local function sp() shT[nm].on=false if shT[nm].th then task.cancel(shT[nm].th) shT[nm].th=nil end tw(tic,.2,{TextColor3=DM}) tw(tnm,.2,{TextColor3=DM}) end tb[nm]={b=b,bar=bar,ss=ss,sp=sp} b.MouseButton1Click:Connect(function() if cur==nm then return end if adc then adc() end for x,d in pairs(tb) do d.sp() tw(d.b,.2,{BackgroundTransparency=1}) tw(d.bar,.15,{BackgroundTransparency=1,Size=UDim2.new(0,3,0,0)}) pgs[x].Visible=false end tw(b,.25,{BackgroundTransparency=.3}) bar.Size,bar.BackgroundTransparency=UDim2.new(0,3,0,0),0 TS:Create(bar,TweenInfo.new(.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,3,1,-10)}):Play() pgs[nm].Visible=true ss() cur=nm end) b.MouseEnter:Connect(function() if cur~=nm then tw(b,.15,{BackgroundTransparency=.5}) tw(tic,.2,{TextColor3=Color3.fromRGB(190,200,220)}) tw(tnm,.2,{TextColor3=Color3.fromRGB(190,200,220)}) end end) b.MouseLeave:Connect(function() if cur~=nm then tw(b,.15,{BackgroundTransparency=1}) tw(tic,.2,{TextColor3=DM}) tw(tnm,.2,{TextColor3=DM}) end end) end tb.Hub.b.BackgroundTransparency,tb.Hub.bar.BackgroundTransparency=.3,0 pgs.Hub.Visible=true cur="Hub" tb.Hub.ss() ----------------------------------------------------- -- ★ ENHANCED ELEMENT BUILDERS ----------------------------------------------------- local function mkCard(pg,h,o) local f=rk(4,ni("Frame",{Size=UDim2.new(1,0,0,h),BackgroundColor3=C.e,BackgroundTransparency=.06,BorderSizePixel=0,LayoutOrder=o or 0,ZIndex=3,ClipsDescendants=true},pg)) cr(f,8) local st=rk(5,ni("UIStroke",{Color=C.br,Thickness=1,Transparency=.12},f)) local ab=rk(6,ni("Frame",{Size=UDim2.new(0,3,1,-12),Position=UDim2.new(0,5,0,6),BackgroundColor3=C.a,BackgroundTransparency=.15,BorderSizePixel=0,ZIndex=5},f)) cr(ab,2) ni("Frame",{Size=UDim2.new(1,-2,0,1),Position=UDim2.new(0,1,0,0),BackgroundColor3=WH,BackgroundTransparency=.93,BorderSizePixel=0,ZIndex=4},f) return f,st,ab end local function sec(pg,t,o) local f=ni("Frame",{Size=UDim2.new(1,0,0,36),BackgroundTransparency=1,LayoutOrder=o or 0,ZIndex=3},pg) local dot=ni("TextLabel",{Size=UDim2.new(0,14,0,14),Position=UDim2.new(0,2,.5,-7),BackgroundTransparency=1,Text="●",TextColor3=C.a,TextSize=8,Font=GF.t,ZIndex=4},f) local l=ni("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,16,0,0),BackgroundTransparency=1,Text=string.upper(t),TextColor3=C.a,TextSize=FS,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},f) local ln=ni("Frame",{Size=UDim2.new(1,-16,0,1),Position=UDim2.new(0,16,1,-3),BackgroundColor3=C.a,BackgroundTransparency=.35,BorderSizePixel=0,ZIndex=4},f) ni("UIGradient",{Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(.5,.4),NumberSequenceKeypoint.new(1,1)})},ln) task.spawn(function() local i=1 while guiAlive and l and l.Parent do tw(l,.5,{TextColor3=C.mg[i]}) tw(dot,.5,{TextColor3=C.mg[i]}) task.wait(.6) i=i%#C.mg+1 end end) end local function inf(pg,t,o) local f=ni("Frame",{Size=UDim2.new(1,0,0,22),BackgroundTransparency=1,LayoutOrder=o or 0,ZIndex=3},pg) ni("TextLabel",{Size=UDim2.new(0,14,1,0),Position=UDim2.new(0,6,0,0),BackgroundTransparency=1,Text="›",TextColor3=C.a,TextSize=FS+2,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},f) ni("TextLabel",{Size=UDim2.new(1,-26,1,0),Position=UDim2.new(0,20,0,0),BackgroundTransparency=1,Text=t,TextColor3=DM,TextSize=FS-1,Font=GF.d,TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true,AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4},f) end local function btn(pg,t,o,fn) local card,st,ab=mkCard(pg,EH,o) ni("TextLabel",{Size=UDim2.new(1,-50,1,0),Position=UDim2.new(0,18,0,0),BackgroundTransparency=1,Text=t,TextColor3=TX,TextSize=FS,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},card) local arr=ni("TextLabel",{Size=UDim2.new(0,20,1,0),Position=UDim2.new(1,-30,0,0),BackgroundTransparency=1,Text="›",TextColor3=C.a,TextSize=FS+8,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Center,TextTransparency=.35,ZIndex=5},card) local hgl=ni("Frame",{Size=UDim2.new(0,0,1,0),Position=UDim2.new(0,0,0,0),BackgroundColor3=C.a,BackgroundTransparency=.94,BorderSizePixel=0,ZIndex=3,ClipsDescendants=true},card) cr(hgl,8) local c=ni("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=6},card) c.MouseEnter:Connect(function() tw(st,.15,{Color=C.a,Transparency=0}) tw(ab,.15,{BackgroundTransparency=0}) tw(arr,.2,{Position=UDim2.new(1,-25,0,0),TextTransparency=0}) tw(hgl,.25,{Size=UDim2.new(1,0,1,0)}) end) c.MouseLeave:Connect(function() tw(st,.15,{Color=C.br,Transparency=.12}) tw(ab,.15,{BackgroundTransparency=.15}) tw(arr,.2,{Position=UDim2.new(1,-30,0,0),TextTransparency=.35}) tw(hgl,.2,{Size=UDim2.new(0,0,1,0)}) end) c.MouseButton1Click:Connect(function() tw(card,.05,{BackgroundColor3=C.a,BackgroundTransparency=.08}) tw(ab,.05,{BackgroundColor3=WH}) task.wait(.1) tw(card,.25,{BackgroundColor3=C.e,BackgroundTransparency=.06}) tw(ab,.25,{BackgroundColor3=C.a}) if fn then fn() end end) end local function tog(pg,t,o,d,fn) local on=d or false local card,st,ab=mkCard(pg,EH,o) ni("TextLabel",{Size=UDim2.new(1,-80,1,0),Position=UDim2.new(0,18,0,0),BackgroundTransparency=1,Text=t,TextColor3=TX,TextSize=FS,Font=GF.b,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},card) local tW,tH=mob and 46 or 42,mob and 24 or 22 local kS=tH-4 local tGlow=ni("Frame",{Size=UDim2.new(0,tW+6,0,tH+6),Position=UDim2.new(1,-(tW+17),.5,-(tH+6)/2),BackgroundColor3=C.a,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=4},card) cr(tGlow,99) local tr=rk(3,ni("Frame",{Size=UDim2.new(0,tW,0,tH),Position=UDim2.new(1,-(tW+14),.5,-tH/2),BackgroundColor3=C.b3,BorderSizePixel=0,ZIndex=5},card)) cr(tr,99) local k=ni("Frame",{Size=UDim2.new(0,kS,0,kS),Position=UDim2.new(0,2,.5,-kS/2),BackgroundColor3=Color3.fromRGB(170,170,180),BorderSizePixel=0,ZIndex=6},tr) cr(k,99) local kGlow=ni("UIStroke",{Color=C.a,Thickness=0,Transparency=.3},k) local function upd(a) local ti=a and TweenInfo.new(.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out) or TweenInfo.new(0) local ti2=a and TweenInfo.new(.2) or TweenInfo.new(0) TS:Create(tr,ti,{BackgroundColor3=on and C.a or C.b3}):Play() TS:Create(k,ti,{Position=UDim2.new(0,on and tW-kS-2 or 2,.5,-kS/2),BackgroundColor3=on and WH or Color3.fromRGB(170,170,180)}):Play() TS:Create(kGlow,ti2,{Thickness=on and 2.5 or 0}):Play() TS:Create(tGlow,ti2,{BackgroundTransparency=on and .87 or 1}):Play() TS:Create(st,ti2,{Color=on and C.a or C.br}):Play() TS:Create(ab,ti2,{BackgroundTransparency=on and 0 or .15}):Play() end upd(false) ni("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=7},card).MouseButton1Click:Connect(function() on=not on upd(true) if fn then fn(on) end end) end -- ★ FIXED SLIDER: single shared input connections instead of per-slider local activeSld=nil local function sld(pg,t,mi,ma,df,o,fn) local v,pct=df or mi,((df or mi)-mi)/(ma-mi) local card,st,ab=mkCard(pg,EH+26,o) ni("TextLabel",{Size=UDim2.new(.6,-18,0,EH-4),Position=UDim2.new(0,18,0,3),BackgroundTransparency=1,Text=t,TextColor3=TX,TextSize=FS,Font=GF.b,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},card) local vB=rk(3,ni("Frame",{Size=UDim2.new(0,50,0,22),Position=UDim2.new(1,-62,0,6),BackgroundColor3=C.b3,BackgroundTransparency=.05,BorderSizePixel=0,ZIndex=5},card)) cr(vB,6) rk(7,ni("UIStroke",{Color=C.a,Thickness=1,Transparency=.35},vB)) local vl=ni("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=tostring(v),TextColor3=TX,TextSize=FS,Font=GF.t,ZIndex=6},vB) local tk=rk(3,ni("Frame",{Size=UDim2.new(1,-28,0,6),Position=UDim2.new(0,14,0,EH+5),BackgroundColor3=C.b3,BorderSizePixel=0,ZIndex=4},card)) cr(tk,99) local fl=rk(6,ni("Frame",{Size=UDim2.new(pct,0,1,0),BackgroundColor3=C.a,BorderSizePixel=0,ZIndex=5},tk)) cr(fl,99) local fg=rk(6,ni("Frame",{Size=UDim2.new(pct,0,0,14),Position=UDim2.new(0,0,-.7,0),BackgroundColor3=C.a,BackgroundTransparency=.88,BorderSizePixel=0,ZIndex=3},tk)) cr(fg,99) local kS=mob and 18 or 16 local kb=ni("Frame",{Size=UDim2.new(0,kS,0,kS),AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(pct,0,.5,0),BackgroundColor3=WH,BorderSizePixel=0,ZIndex=7},tk) cr(kb,99) rk(7,ni("UIStroke",{Color=C.a,Thickness=2.5,Transparency=.08},kb)) ni("TextLabel",{Size=UDim2.new(0,30,0,14),Position=UDim2.new(0,14,0,EH+14),BackgroundTransparency=1,Text=tostring(mi),TextColor3=DM,TextSize=FS-3,Font=GF.d,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},card) ni("TextLabel",{Size=UDim2.new(0,30,0,14),Position=UDim2.new(1,-44,0,EH+14),BackgroundTransparency=1,Text=tostring(ma),TextColor3=DM,TextSize=FS-3,Font=GF.d,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=4},card) local sldData={tk=tk,fl=fl,fg=fg,kb=kb,kS=kS,st=st,mi=mi,ma=ma,vl=vl,fn=fn,v=v} local function upd(ix) local tp,ts=tk.AbsolutePosition.X,tk.AbsoluteSize.X if ts<1 then return end local x=math.clamp((ix-tp)/ts,0,1) sldData.v=math.floor(mi+x*(ma-mi)+.5) local p2=(sldData.v-mi)/(ma-mi) tw(fl,.05,{Size=UDim2.new(p2,0,1,0)}) tw(fg,.05,{Size=UDim2.new(p2,0,0,14)}) tw(kb,.05,{Position=UDim2.new(p2,0,.5,0)}) vl.Text=tostring(sldData.v) if fn then fn(sldData.v) end end -- ★ Bigger touch area for mobile local hit=ni("TextButton",{Size=UDim2.new(1,-16,0,mob and 36 or 30),Position=UDim2.new(0,8,0,EH-4),BackgroundTransparency=1,Text="",ZIndex=9},card) hit.InputBegan:Connect(function(ii) if ii.UserInputType==Enum.UserInputType.MouseButton1 or ii.UserInputType==Enum.UserInputType.Touch then activeSld={upd=upd,st=st,kb=kb,kS=kS} upd(ii.Position.X) tw(st,.1,{Color=C.a}) tw(kb,.1,{Size=UDim2.new(0,kS+4,0,kS+4)}) end end) end -- ★ SINGLE global connections for ALL sliders (no memory leak) UIS.InputChanged:Connect(function(ii) if activeSld and(ii.UserInputType==Enum.UserInputType.MouseMovement or ii.UserInputType==Enum.UserInputType.Touch) then activeSld.upd(ii.Position.X) end end) UIS.InputEnded:Connect(function(ii) if activeSld and(ii.UserInputType==Enum.UserInputType.MouseButton1 or ii.UserInputType==Enum.UserInputType.Touch) then tw(activeSld.st,.15,{Color=C.br}) tw(activeSld.kb,.15,{Size=UDim2.new(0,activeSld.kS,0,activeSld.kS)}) activeSld=nil end end) local function dd(pg,t,opF,o,d,fn) local op,iH,isF=false,mob and 40 or 34,type(opF)=="function" local cO=isF and(opF() or{}) or(opF or{}) local sel=d local c2=ni("Frame",{Size=UDim2.new(1,0,0,EH),BackgroundTransparency=1,LayoutOrder=o or 0,ZIndex=3,ClipsDescendants=false},pg) local card,st,ab=mkCard(c2,EH,0) card.Size=UDim2.new(1,0,1,0) card.LayoutOrder=0 ni("TextLabel",{Size=UDim2.new(.42,-14,1,0),Position=UDim2.new(0,18,0,0),BackgroundTransparency=1,Text=t,TextColor3=TX,TextSize=FS,Font=GF.b,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=11},card) local slP=rk(3,ni("Frame",{Size=UDim2.new(.5,-20,0,26),Position=UDim2.new(.42,4,.5,-13),BackgroundColor3=C.b3,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=11},card)) cr(slP,6) local vlb=ni("TextLabel",{Size=UDim2.new(1,-24,1,0),Position=UDim2.new(0,8,0,0),BackgroundTransparency=1,Text=sel or"Select...",TextColor3=sel and TX or DM,TextSize=FS-1,Font=sel and GF.t or GF.d,TextXAlignment=Enum.TextXAlignment.Right,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=12},slP) local chev=ni("TextLabel",{Size=UDim2.new(0,20,1,0),Position=UDim2.new(1,-20,0,0),BackgroundTransparency=1,Text="▾",TextColor3=DM,TextSize=FS,Font=GF.t,ZIndex=12},slP) local df=rk(2,ni("Frame",{BackgroundColor3=C.b2,BorderSizePixel=0,Visible=false,ZIndex=55,ClipsDescendants=true},ov)) cr(df,8) ni("UIStroke",{Color=C.a,Thickness=1,Transparency=.4},df) local ds=rk(8,ni("ScrollingFrame",{Size=UDim2.new(1,-4,1,-4),Position=UDim2.new(0,2,0,2),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=C.a,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(0,0,0,0),ZIndex=56},df)) ni("UIListLayout",{Padding=UDim.new(0,3),SortOrder=Enum.SortOrder.LayoutOrder},ds) ni("UIPadding",{PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5),PaddingLeft=UDim.new(0,5),PaddingRight=UDim.new(0,5)},ds) local bk=ni("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=52,Visible=false},ov) local obs,cl={},nil local function build() for _,b in pairs(obs) do b:Destroy() end obs={} if #cO==0 then local ob=ni("TextButton",{Size=UDim2.new(1,0,0,iH),BackgroundColor3=C.b3,BackgroundTransparency=.1,Text="No options",TextColor3=DM,TextSize=FS,Font=GF.d,AutoButtonColor=false,ZIndex=58},ds) cr(ob,6) table.insert(obs,ob) return end for idx,opt in ipairs(cO) do local is=opt==sel local ob=ni("TextButton",{Size=UDim2.new(1,0,0,iH),BackgroundColor3=is and C.a or C.b3,BackgroundTransparency=is and .55 or.05,Text="",AutoButtonColor=false,LayoutOrder=idx,ZIndex=58},ds) cr(ob,6) if is then local abr=ni("Frame",{Size=UDim2.new(0,3,1,-8),Position=UDim2.new(0,4,0,4),BackgroundColor3=C.a,BorderSizePixel=0,ZIndex=59},ob) cr(abr,2) end ni("TextLabel",{Size=UDim2.new(1,is and-40 or-16,1,0),Position=UDim2.new(0,is and 14 or 8,0,0),BackgroundTransparency=1,Text=opt,TextColor3=is and WH or TX,TextSize=FS,Font=is and GF.t or GF.b,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=59},ob) if is then ni("TextLabel",{Size=UDim2.new(0,22,1,0),Position=UDim2.new(1,-28,0,0),BackgroundTransparency=1,Text="✓",TextColor3=WH,TextSize=FS,Font=GF.t,ZIndex=60},ob) end ob.MouseEnter:Connect(function() if opt~=sel then tw(ob,.1,{BackgroundColor3=C.e,BackgroundTransparency=0}) end end) ob.MouseLeave:Connect(function() if opt~=sel then tw(ob,.1,{BackgroundColor3=C.b3,BackgroundTransparency=.05}) end end) ob.MouseButton1Click:Connect(function() sel=opt vlb.Text,vlb.TextColor3,vlb.Font=sel,TX,GF.t cl() if fn then fn(sel) end end) table.insert(obs,ob) end end cl=function() if not op then return end op=false tw(chev,.2,{Rotation=0}) tw(st,.15,{Color=C.br}) tw(ab,.15,{BackgroundTransparency=.15}) TS:Create(df,TweenInfo.new(.15),{Size=UDim2.new(0,df.Size.X.Offset,0,0),BackgroundTransparency=1}):Play() task.delay(.15,function() df.Visible,bk.Visible=false,false end) if adc==cl then adc=nil end end local function opn() if adc and adc~=cl then adc() end op,adc=true,cl if isF then cO=opF() or{} end build() local ap,as,op2=card.AbsolutePosition,card.AbsoluteSize,ov.AbsolutePosition local lH=math.min(math.max(#cO,1),5)*(iH+3)+14 local xx,yy=ap.X-op2.X,ap.Y-op2.Y+as.Y+4 if yy+lH>ov.AbsoluteSize.Y then yy=ap.Y-op2.Y-lH-4 end df.Position,df.Size,df.BackgroundTransparency,df.Visible,bk.Visible=UDim2.new(0,xx,0,yy),UDim2.new(0,as.X,0,0),1,true,true tw(chev,.2,{Rotation=180}) tw(st,.15,{Color=C.a}) tw(ab,.15,{BackgroundTransparency=0}) TS:Create(df,TweenInfo.new(.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,as.X,0,lH),BackgroundTransparency=0}):Play() end ni("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=12},card).MouseButton1Click:Connect(function() if op then cl() else opn() end end) bk.MouseButton1Click:Connect(cl) card.MouseEnter:Connect(function() if not op then tw(card,.1,{BackgroundTransparency=0}) tw(st,.1,{Color=C.a,Transparency=.3}) end end) card.MouseLeave:Connect(function() if not op then tw(card,.1,{BackgroundTransparency=.06}) tw(st,.1,{Color=C.br,Transparency=.12}) end end) if isF then task.spawn(function() while guiAlive and c2 and c2.Parent do task.wait(1) local ok,nO=pcall(opF) cO=ok and nO or{} if sel then local f=false for _,vv in ipairs(cO) do if vv==sel then f=true break end end if not f then sel=nil vlb.Text,vlb.TextColor3,vlb.Font="Select...",DM,GF.d if fn then pcall(fn,nil) end end end if op and df.Visible then build() tw(df,.15,{Size=UDim2.new(0,card.AbsoluteSize.X,0,math.min(math.max(#cO,1),5)*(iH+3)+14)}) end end end) end end ----------------------------------------------------- -- ★ ENHANCED NOTIFICATIONS ----------------------------------------------------- local function Notif(ti,ms,k) local cols={info=C.a,success=Color3.fromRGB(34,197,94),error=Color3.fromRGB(220,50,50),warn=Color3.fromRGB(234,179,8)} local ac=cols[k] or cols.info local nf=ni("Frame",{Size=UDim2.new(0,280,0,62),Position=UDim2.new(1,10,1,-80),BackgroundColor3=C.b1,BorderSizePixel=0,ZIndex=200},sg) cr(nf,10) ni("UIStroke",{Color=ac,Thickness=1.5,Transparency=.15},nf) local nb=ni("Frame",{Size=UDim2.new(0,3,1,-14),Position=UDim2.new(0,7,0,7),BackgroundColor3=ac,BorderSizePixel=0,ZIndex=201},nf) cr(nb,2) local icons={info="ℹ",success="✓",error="✕",warn="⚠"} local ib=ni("Frame",{Size=UDim2.new(0,22,0,22),Position=UDim2.new(0,18,0,10),BackgroundColor3=ac,BackgroundTransparency=.85,BorderSizePixel=0,ZIndex=201},nf) cr(ib,11) ni("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=icons[k] or"ℹ",TextColor3=ac,Font=GF.t,TextSize=12,ZIndex=202},ib) ni("TextLabel",{Size=UDim2.new(1,-52,0,18),Position=UDim2.new(0,46,0,9),BackgroundTransparency=1,Text=ti,TextColor3=TX,Font=GF.t,TextSize=13,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=201},nf) ni("TextLabel",{Size=UDim2.new(1,-52,0,14),Position=UDim2.new(0,46,0,30),BackgroundTransparency=1,Text=ms,TextColor3=DM,Font=GF.d,TextSize=11,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=201},nf) local pb=ni("Frame",{Size=UDim2.new(1,-12,0,2),Position=UDim2.new(0,6,1,-6),BackgroundColor3=ac,BorderSizePixel=0,ZIndex=202},nf) cr(pb,1) TS:Create(nf,TweenInfo.new(.35,Enum.EasingStyle.Quint),{Position=UDim2.new(1,-300,1,-80)}):Play() TS:Create(pb,TweenInfo.new(3,Enum.EasingStyle.Linear),{Size=UDim2.new(0,0,0,2)}):Play() task.delay(3,function() TS:Create(nf,TweenInfo.new(.3),{Position=UDim2.new(1,10,1,-80)}):Play() task.delay(.35,function() nf:Destroy() end) end) end ----------------------------------------------------- -- ★ HUB PAGE ----------------------------------------------------- sec(pgs.Hub,"Welcome",1) inf(pgs.Hub,"CK's Hub v2.2 — Premium GUI Framework",2) inf(pgs.Hub,"discord.gg/escypvhJHu",3) btn(pgs.Hub,"Copy Discord Invite",4,function() pcall(function() setclipboard("discord.gg/escypvhJHu") end) Notif("Discord","Invite link copied!","success") end) sec(pgs.Hub,"Demo Elements",5) btn(pgs.Hub,"Test Button",6,function() Notif("Button","Clicked successfully!","info") end) tog(pgs.Hub,"Test Toggle",7,false,function(v) Notif("Toggle",v and"Enabled"or"Disabled",v and"success"or"warn") end) sld(pgs.Hub,"Test Slider",0,100,50,8,function(v) print("Slider:",v) end) dd(pgs.Hub,"Test Dropdown",{"Option 1","Option 2","Option 3"},9,nil,function(v) Notif("Selected",v or"None","info") end) sec(pgs.Hub,"Information",10) inf(pgs.Hub,"Use the sidebar to navigate between tabs",11) inf(pgs.Hub,"All elements support theme switching",12) ----------------------------------------------------- -- ★ CONFIG PAGE ----------------------------------------------------- sec(pgs.Config,"Appearance",1) dd(pgs.Config,"Theme",{"Purple","Blue","Red","Green","Orange","Cyan","Pink"},2,"Purple",function(v) local map={Purple="P",Blue="B",Red="R",Green="G",Orange="O",Cyan="C",Pink="K"} if Th[map[v]] then aT(Th[map[v]]) Notif("Theme","Switched to "..v,"success") end end) inf(pgs.Config,"Select a theme to customize the UI",3) sec(pgs.Config,"Actions",4) btn(pgs.Config,"Destroy GUI",5,function() sg:Destroy() end) inf(pgs.Config,"This will permanently close the GUI",6) ----------------------------------------------------- -- DRAG / MINIMIZE / CLOSE ----------------------------------------------------- do local dg,di,ds,sp hdr.InputBegan:Connect(function(ii) if ii.UserInputType==Enum.UserInputType.MouseButton1 or ii.UserInputType==Enum.UserInputType.Touch then dg,ds,sp=true,ii.Position,mn.Position ii.Changed:Connect(function() if ii.UserInputState==Enum.UserInputState.End then dg=false end end) end end) hdr.InputChanged:Connect(function(ii) if ii.UserInputType==Enum.UserInputType.MouseMovement or ii.UserInputType==Enum.UserInputType.Touch then di=ii end end) UIS.InputChanged:Connect(function(ii) if ii==di and dg then local d=ii.Position-ds mn.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y) end end) end local full=UDim2.new(0,GW,0,GH) local function doMin() if adc then adc() end TS:Create(mn,TweenInfo.new(.25),{Size=UDim2.new(0,0,0,0),Position=UDim2.new(mn.Position.X.Scale,mn.Position.X.Offset+GW/2,mn.Position.Y.Scale,mn.Position.Y.Offset+GH/2)}):Play() task.delay(.25,function() mn.Visible,floatBtn.Visible=false,true end) end local function doRes() floatBtn.Visible,mn.Visible,mn.Size=false,true,UDim2.new(0,0,0,0) local ss=sg.AbsoluteSize mn.Position=UDim2.new(0,ss.X/2,0,ss.Y/2) TS:Create(mn,TweenInfo.new(.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=full,Position=UDim2.new(0,ss.X/2-GW/2,0,ss.Y/2-GH/2)}):Play() end mbtn.MouseButton1Click:Connect(doMin) cbtn.MouseButton1Click:Connect(function() if adc then adc() end TS:Create(mn,TweenInfo.new(.2),{Size=UDim2.new(0,0,0,0)}):Play() task.wait(.25) sg:Destroy() end) floatBtn.MouseButton1Click:Connect(doRes) mn.Size=UDim2.new(0,GW,0,0) TS:Create(mn,TweenInfo.new(.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=full}):Play() print("[MD's Hub] Mobile-Safe Framework Loaded — 99 nights")
+-- MD's Hub GUI Framework v2.2 — Mobile-Safe Build
+local Players,UIS,TS=game:GetService("Players"),game:GetService("UserInputService"),game:GetService("TweenService")
+local P,pGui=Players.LocalPlayer,Players.LocalPlayer:WaitForChild("PlayerGui")
+for _,v in pairs(pGui:GetChildren()) do if v.Name=="CKHub" then v:Destroy() end end task.wait(.1)
+
+local mob=UIS.TouchEnabled and not UIS.KeyboardEnabled
+local GF,TX,DM,WH={t=Enum.Font.FredokaOne,b=Enum.Font.GothamSemibold,d=Enum.Font.Gotham},Color3.fromRGB(235,235,240),Color3.fromRGB(120,120,138),Color3.new(1,1,1)
+local GW,GH,SW,TH,EH,FS=mob and 420 or 580,mob and 420 or 480,mob and 115 or 145,mob and 54 or 52,mob and 44 or 42,mob and 14 or 13
+
+-- ★ SAFE FONT LOADING (prevents crash on mobile executors)
+local function safeFont(name,fallback)
+	local ok,f=pcall(function() return Enum.Font[name] end)
+	if ok and f then return f end
+	return fallback or Enum.Font.FredokaOne
+end
+local titleFont=safeFont("PermanentMarker",Enum.Font.FredokaOne)
+local medFont=safeFont("GothamMedium",Enum.Font.Gotham)
+local boldFont=safeFont("GothamBold",Enum.Font.GothamSemibold)
+
+local Th={
+	P={a=Color3.fromRGB(160,80,240),ad=Color3.fromRGB(110,50,190),b1=Color3.fromRGB(14,10,22),b2=Color3.fromRGB(20,14,30),b3=Color3.fromRGB(28,18,42),e=Color3.fromRGB(36,22,52),br=Color3.fromRGB(50,30,70),mg={Color3.fromRGB(160,80,240),Color3.fromRGB(180,110,255),Color3.fromRGB(200,150,255),Color3.fromRGB(220,190,255),Color3.fromRGB(200,150,255),Color3.fromRGB(180,110,255)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(210,170,255),Color3.fromRGB(185,130,255),Color3.fromRGB(160,80,240),Color3.fromRGB(185,130,255),Color3.fromRGB(210,170,255)},ts={Color3.fromRGB(200,150,255),Color3.fromRGB(220,180,255),Color3.fromRGB(170,110,240),Color3.fromRGB(240,210,255)}},
+	B={a=Color3.fromRGB(90,120,255),ad=Color3.fromRGB(60,90,200),b1=Color3.fromRGB(15,15,20),b2=Color3.fromRGB(22,22,28),b3=Color3.fromRGB(30,30,38),e=Color3.fromRGB(40,40,45),br=Color3.fromRGB(48,48,60),mg={Color3.fromRGB(90,120,255),Color3.fromRGB(120,160,255),Color3.fromRGB(160,200,255),Color3.fromRGB(200,230,255),Color3.fromRGB(160,200,255),Color3.fromRGB(120,160,255)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(180,210,255),Color3.fromRGB(140,185,255),Color3.fromRGB(100,160,255),Color3.fromRGB(140,185,255),Color3.fromRGB(180,210,255)},ts={Color3.fromRGB(140,200,255),Color3.fromRGB(180,220,255),Color3.fromRGB(100,180,255),Color3.fromRGB(200,235,255)}},
+	R={a=Color3.fromRGB(220,50,50),ad=Color3.fromRGB(170,30,30),b1=Color3.fromRGB(20,12,12),b2=Color3.fromRGB(28,16,16),b3=Color3.fromRGB(38,22,22),e=Color3.fromRGB(45,28,28),br=Color3.fromRGB(60,35,35),mg={Color3.fromRGB(220,50,50),Color3.fromRGB(240,80,80),Color3.fromRGB(255,120,120),Color3.fromRGB(255,160,160),Color3.fromRGB(255,120,120),Color3.fromRGB(240,80,80)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(255,180,180),Color3.fromRGB(255,140,140),Color3.fromRGB(220,80,80),Color3.fromRGB(255,140,140),Color3.fromRGB(255,180,180)},ts={Color3.fromRGB(255,140,140),Color3.fromRGB(255,180,180),Color3.fromRGB(220,100,100),Color3.fromRGB(255,200,200)}},
+	G={a=Color3.fromRGB(50,200,100),ad=Color3.fromRGB(30,150,70),b1=Color3.fromRGB(10,18,14),b2=Color3.fromRGB(14,24,18),b3=Color3.fromRGB(18,32,24),e=Color3.fromRGB(22,40,30),br=Color3.fromRGB(30,55,40),mg={Color3.fromRGB(50,200,100),Color3.fromRGB(80,220,120),Color3.fromRGB(120,240,160),Color3.fromRGB(160,255,200),Color3.fromRGB(120,240,160),Color3.fromRGB(80,220,120)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(160,255,190),Color3.fromRGB(100,230,140),Color3.fromRGB(50,200,100),Color3.fromRGB(100,230,140),Color3.fromRGB(160,255,190)},ts={Color3.fromRGB(120,240,160),Color3.fromRGB(160,255,200),Color3.fromRGB(80,210,130),Color3.fromRGB(200,255,220)}},
+	O={a=Color3.fromRGB(255,140,30),ad=Color3.fromRGB(200,100,10),b1=Color3.fromRGB(20,14,8),b2=Color3.fromRGB(28,20,10),b3=Color3.fromRGB(38,28,14),e=Color3.fromRGB(48,34,16),br=Color3.fromRGB(65,46,20),mg={Color3.fromRGB(255,140,30),Color3.fromRGB(255,165,60),Color3.fromRGB(255,195,100),Color3.fromRGB(255,220,150),Color3.fromRGB(255,195,100),Color3.fromRGB(255,165,60)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(255,210,140),Color3.fromRGB(255,175,80),Color3.fromRGB(230,130,30),Color3.fromRGB(255,175,80),Color3.fromRGB(255,210,140)},ts={Color3.fromRGB(255,190,100),Color3.fromRGB(255,215,140),Color3.fromRGB(240,160,60),Color3.fromRGB(255,230,170)}},
+	C={a=Color3.fromRGB(0,210,230),ad=Color3.fromRGB(0,160,180),b1=Color3.fromRGB(8,18,22),b2=Color3.fromRGB(10,24,30),b3=Color3.fromRGB(14,32,40),e=Color3.fromRGB(16,40,50),br=Color3.fromRGB(22,55,68),mg={Color3.fromRGB(0,210,230),Color3.fromRGB(40,225,240),Color3.fromRGB(100,240,250),Color3.fromRGB(160,250,255),Color3.fromRGB(100,240,250),Color3.fromRGB(40,225,240)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(160,245,255),Color3.fromRGB(80,230,248),Color3.fromRGB(0,200,225),Color3.fromRGB(80,230,248),Color3.fromRGB(160,245,255)},ts={Color3.fromRGB(100,235,250),Color3.fromRGB(150,245,255),Color3.fromRGB(50,215,235),Color3.fromRGB(190,252,255)}},
+	K={a=Color3.fromRGB(240,80,180),ad=Color3.fromRGB(190,50,140),b1=Color3.fromRGB(22,10,18),b2=Color3.fromRGB(30,14,24),b3=Color3.fromRGB(40,18,32),e=Color3.fromRGB(50,22,40),br=Color3.fromRGB(68,30,55),mg={Color3.fromRGB(240,80,180),Color3.fromRGB(250,110,200),Color3.fromRGB(255,150,220),Color3.fromRGB(255,190,235),Color3.fromRGB(255,150,220),Color3.fromRGB(250,110,200)},hg={Color3.fromRGB(235,235,240),Color3.fromRGB(255,190,230),Color3.fromRGB(255,145,215),Color3.fromRGB(235,75,175),Color3.fromRGB(255,145,215),Color3.fromRGB(255,190,230)},ts={Color3.fromRGB(255,150,215),Color3.fromRGB(255,185,232),Color3.fromRGB(235,100,190),Color3.fromRGB(255,210,245)}}
+}
+
+local C,Reg,shT,adc,mnG,mdL,huL,mdT,huT={},{{},{},{},{},{},{},{},{}},{},nil,nil,nil,nil,nil,nil
+for k,v in pairs(Th.P) do C[k]=v end
+
+-- ★ ALIVE CHECK (prevents orphaned loops)
+local guiAlive=true
+
+local function tw(o,d,p) TS:Create(o,TweenInfo.new(d),p):Play() end
+local function ni(c,p,r) local o=Instance.new(c) for k,v in pairs(p or{}) do o[k]=v end if r then o.Parent=r end return o end
+local function cr(o,r) ni("UICorner",{CornerRadius=UDim.new(0,r or 6)},o) end
+local function rk(i,o) table.insert(Reg[i],o) return o end
+local function sCS(t) return ColorSequence.new({ColorSequenceKeypoint.new(0,t.a),ColorSequenceKeypoint.new(.15,t.br),ColorSequenceKeypoint.new(.42,t.ad),ColorSequenceKeypoint.new(.48,t.mg[3]),ColorSequenceKeypoint.new(.5,t.mg[4]),ColorSequenceKeypoint.new(.52,t.mg[3]),ColorSequenceKeypoint.new(.58,t.ad),ColorSequenceKeypoint.new(.85,t.br),ColorSequenceKeypoint.new(1,t.a)}) end
+local function glow(o,g,d,w) local i=1 while guiAlive and o and o.Parent do tw(o,d or.5,{TextColor3=g[i]}) task.wait(w or.6) i=i%#g+1 end end
+
+local function aT(t)
+	for k,v in pairs(t) do C[k]=v end
+	for _,o in pairs(Reg[1]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.b1}) end end
+	for _,o in pairs(Reg[2]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.b2}) end end
+	for _,o in pairs(Reg[3]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.b3}) end end
+	for _,o in pairs(Reg[4]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.e}) end end
+	for _,o in pairs(Reg[5]) do if o and o.Parent then if o:IsA("UIStroke") then tw(o,.35,{Color=t.br}) else tw(o,.35,{BackgroundColor3=t.br}) end end end
+	for _,o in pairs(Reg[6]) do if o and o.Parent then tw(o,.35,{BackgroundColor3=t.a}) end end
+	for _,o in pairs(Reg[7]) do if o and o.Parent then tw(o,.35,{Color=t.a}) end end
+	for _,o in pairs(Reg[8]) do if o and o.Parent then o.ScrollBarImageColor3=t.a end end
+	if mnG then mnG.Color=sCS(t) end
+	if mdT then task.cancel(mdT) end mdT=task.spawn(glow,mdL,t.mg,.6,.7)
+	if huT then task.cancel(huT) end huT=task.spawn(function() task.wait(.35) glow(huL,t.hg,.6,.7) end)
+	for _,v in pairs(shT) do if v.on then if v.th then task.cancel(v.th) end v.th=task.spawn(function() local i=1 while guiAlive do tw(v.ic,.4,{TextColor3=t.ts[i]}) tw(v.nm,.4,{TextColor3=t.ts[i]}) task.wait(.5) i=i%#t.ts+1 end end) end end
+end
+
+local sg=ni("ScreenGui",{Name="CKHub",ResetOnSpawn=false},pGui)
+-- ★ KILL SWITCH: stop all loops when GUI destroyed
+sg.Destroying:Connect(function() guiAlive=false end)
+
+local mn=rk(1,ni("Frame",{Size=UDim2.new(0,GW,0,GH),Position=UDim2.new(.5,-GW/2,.5,-GH/2),BackgroundColor3=C.b1,BorderSizePixel=0,ClipsDescendants=true},sg)) cr(mn,12)
+local mnS=ni("UIStroke",{Thickness=1.5,Transparency=.08,Color=WH,ApplyStrokeMode=Enum.ApplyStrokeMode.Border},mn)
+mnG=ni("UIGradient",{Color=sCS(C),Rotation=0},mnS)
+task.spawn(function() while guiAlive and mn and mn.Parent do mnG.Rotation=0 TS:Create(mnG,TweenInfo.new(3.5,Enum.EasingStyle.Linear),{Rotation=360}):Play() task.wait(3.5) end end)
+
+local hdr=rk(2,ni("Frame",{Size=UDim2.new(1,0,0,TH),BackgroundColor3=C.b2,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=5},mn)) cr(hdr,12)
+rk(5,ni("Frame",{Size=UDim2.new(1,0,0,1),Position=UDim2.new(0,0,0,TH),BackgroundColor3=C.br,BorderSizePixel=0,ZIndex=5},mn))
+
+-- ★ TITLE: "MD's Hub" + subtitle "99 nights" (safe fonts)
+local tf=ni("Frame",{Size=UDim2.new(0,260,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,ZIndex=6},hdr)
+mdL=ni("TextLabel",{Size=UDim2.new(0,62,0,26),Position=UDim2.new(0,0,0,3),BackgroundTransparency=1,Text="CK's",TextColor3=C.a,TextSize=mob and 20 or 19,Font=titleFont,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},tf)
+huL=ni("TextLabel",{Size=UDim2.new(0,55,0,26),Position=UDim2.new(0,52,0,3),BackgroundTransparency=1,Text="Hub",TextColor3=TX,TextSize=mob and 20 or 19,Font=titleFont,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},tf)
+local subL=ni("TextLabel",{Size=UDim2.new(0,120,0,16),Position=UDim2.new(0,1,0,28),BackgroundTransparency=1,Text="99 nights",TextColor3=DM,TextSize=mob and 11 or 10,Font=medFont,TextXAlignment=Enum.TextXAlignment.Left,TextTransparency=.2,ZIndex=6},tf)
+local dotL=ni("TextLabel",{Size=UDim2.new(0,10,0,16),Position=UDim2.new(0,64,0,28),BackgroundTransparency=1,Text="·",TextColor3=C.a,TextSize=12,Font=boldFont,TextTransparency=.3,ZIndex=6},tf)
+mdT=task.spawn(glow,mdL,C.mg,.6,.7)
+huT=task.spawn(function() task.wait(.35) glow(huL,C.hg,.6,.7) end)
+task.spawn(function() while guiAlive and subL and subL.Parent do tw(subL,.8,{TextColor3=C.a,TextTransparency=.3}) task.wait(1.2) tw(subL,.8,{TextColor3=DM,TextTransparency=.2}) task.wait(1.2) end end)
+
+-- ★ BIGGER TOUCH TARGETS for mobile (38px vs 30px)
+local function mkBtn(off,hc) local s=mob and 38 or 30 local b=ni("TextButton",{Size=UDim2.new(0,s,0,s),Position=UDim2.new(1,off,.5,-s/2),BackgroundTransparency=1,BackgroundColor3=C.b3,Text="",ZIndex=7},hdr) cr(b,7) b.MouseEnter:Connect(function() tw(b,.12,{BackgroundTransparency=0,BackgroundColor3=hc}) end) b.MouseLeave:Connect(function() tw(b,.12,{BackgroundTransparency=1}) end) return b end
+local function mkL(p,r,s) local l=ni("Frame",{Size=UDim2.new(0,s or 14,0,2),AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,0),BackgroundColor3=DM,BorderSizePixel=0,Rotation=r or 0,ZIndex=8},p) cr(l,2) return l end
+local cbtn,mbtn=mkBtn(mob and-44 or-36,Color3.fromRGB(200,55,55)),mkBtn(mob and-88 or-72,C.b3)
+local x1,x2=mkL(cbtn,45),mkL(cbtn,-45) cbtn.MouseEnter:Connect(function() tw(x1,.12,{BackgroundColor3=WH}) tw(x2,.12,{BackgroundColor3=WH}) end) cbtn.MouseLeave:Connect(function() tw(x1,.12,{BackgroundColor3=DM}) tw(x2,.12,{BackgroundColor3=DM}) end)
+local mln=mkL(mbtn,0) mbtn.MouseEnter:Connect(function() tw(mln,.12,{BackgroundColor3=WH}) end) mbtn.MouseLeave:Connect(function() tw(mln,.12,{BackgroundColor3=DM}) end)
+
+local floatBtn=rk(6,ni("TextButton",{Size=UDim2.new(0,56,0,56),Position=UDim2.new(0,20,.5,-28),BackgroundColor3=C.a,BorderSizePixel=0,Text="",ZIndex=200,Visible=false},sg)) cr(floatBtn,28) ni("UIStroke",{Color=C.a,Thickness=2,Transparency=.3},floatBtn)
+local floatImg=ni("ImageLabel",{Size=UDim2.new(0,40,0,40),AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,0),BackgroundTransparency=1,Image="rbxassetid://75252803788136",ScaleType=Enum.ScaleType.Fit,ZIndex=201},floatBtn) cr(floatImg,20)
+local sd=rk(2,ni("Frame",{Size=UDim2.new(0,SW,1,0),BackgroundColor3=C.b2,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=3},mn)) cr(sd,12)
+rk(5,ni("Frame",{Size=UDim2.new(0,1,1,-(TH+1)),Position=UDim2.new(0,SW,0,TH+1),BackgroundColor3=C.br,BorderSizePixel=0,ZIndex=3},mn))
+local sdScr=ni("ScrollingFrame",{Size=UDim2.new(1,0,1,-(TH+11)),Position=UDim2.new(0,0,0,TH+11),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=0,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(0,0,0,0),ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true},sd)
+ni("UIListLayout",{SortOrder=Enum.SortOrder.LayoutOrder,Padding=UDim.new(0,3)},sdScr) ni("UIPadding",{PaddingTop=UDim.new(0,4),PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingBottom=UDim.new(0,8)},sdScr)
+
+local ctArea=ni("Frame",{Size=UDim2.new(1,-(SW+1),1,-(TH+1)),Position=UDim2.new(0,SW+1,0,TH+1),BackgroundTransparency=1,BorderSizePixel=0,ZIndex=2,ClipsDescendants=true},mn)
+local ov=ni("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=50},mn)
+local pc=ni("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=2,ClipsDescendants=false},ctArea)
+
+local ctBg=ni("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=C.b1,BackgroundTransparency=.6,BorderSizePixel=0,ZIndex=1},ctArea) cr(ctBg,0)
+ni("UIGradient",{Rotation=145,Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.85),NumberSequenceKeypoint.new(.5,.95),NumberSequenceKeypoint.new(1,.98)})},ctBg)
+
+-- TAB SYSTEM
+local tl,pgs,tb,cur={{"Hub","H"},{"Config","G"}},{},{},nil
+for i,v in ipairs(tl) do
+	local nm,ic=v[1],v[2]
+	local pg=rk(8,ni("ScrollingFrame",{Name=nm,Size=UDim2.new(1,-16,1,-8),Position=UDim2.new(0,6,0,6),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=C.a,Visible=false,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(0,0,0,0),ZIndex=2,ClipsDescendants=false},pc))
+	ni("UIListLayout",{Padding=UDim.new(0,8),SortOrder=Enum.SortOrder.LayoutOrder},pg) ni("UIPadding",{PaddingTop=UDim.new(0,6),PaddingRight=UDim.new(0,12),PaddingLeft=UDim.new(0,4),PaddingBottom=UDim.new(0,14)},pg) pgs[nm]=pg
+	local b=ni("TextButton",{Size=UDim2.new(1,0,0,mob and 40 or 32),BackgroundColor3=C.e,BackgroundTransparency=1,Text="",LayoutOrder=i,ZIndex=4},sdScr) cr(b,6)
+	local bar=rk(6,ni("Frame",{Size=UDim2.new(0,3,1,-10),Position=UDim2.new(0,0,0,5),BackgroundColor3=C.a,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=5},b)) cr(bar,2)
+	local ibg=rk(3,ni("Frame",{Size=UDim2.new(0,20,0,20),Position=UDim2.new(0,8,.5,-10),BackgroundColor3=C.b3,BackgroundTransparency=.5,BorderSizePixel=0,ZIndex=5},b)) cr(ibg,10)
+	local tic=ni("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=ic,TextColor3=DM,TextSize=FS-1,Font=GF.t,ZIndex=6},ibg)
+	local tnm=ni("TextLabel",{Size=UDim2.new(1,-38,1,0),Position=UDim2.new(0,34,0,0),BackgroundTransparency=1,Text=nm,TextColor3=DM,TextSize=FS,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=5},b)
+	shT[nm]={on=false,th=nil,ic=tic,nm=tnm}
+	local function ss() shT[nm].on=true if shT[nm].th then task.cancel(shT[nm].th) end shT[nm].th=task.spawn(function() local idx=1 while guiAlive do tw(tic,.4,{TextColor3=C.ts[idx]}) tw(tnm,.4,{TextColor3=C.ts[idx]}) task.wait(.5) idx=idx%#C.ts+1 end end) end
+	local function sp() shT[nm].on=false if shT[nm].th then task.cancel(shT[nm].th) shT[nm].th=nil end tw(tic,.2,{TextColor3=DM}) tw(tnm,.2,{TextColor3=DM}) end
+	tb[nm]={b=b,bar=bar,ss=ss,sp=sp}
+	b.MouseButton1Click:Connect(function() if cur==nm then return end if adc then adc() end for x,d in pairs(tb) do d.sp() tw(d.b,.2,{BackgroundTransparency=1}) tw(d.bar,.15,{BackgroundTransparency=1,Size=UDim2.new(0,3,0,0)}) pgs[x].Visible=false end tw(b,.25,{BackgroundTransparency=.3}) bar.Size,bar.BackgroundTransparency=UDim2.new(0,3,0,0),0 TS:Create(bar,TweenInfo.new(.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,3,1,-10)}):Play() pgs[nm].Visible=true ss() cur=nm end)
+	b.MouseEnter:Connect(function() if cur~=nm then tw(b,.15,{BackgroundTransparency=.5}) tw(tic,.2,{TextColor3=Color3.fromRGB(190,200,220)}) tw(tnm,.2,{TextColor3=Color3.fromRGB(190,200,220)}) end end)
+	b.MouseLeave:Connect(function() if cur~=nm then tw(b,.15,{BackgroundTransparency=1}) tw(tic,.2,{TextColor3=DM}) tw(tnm,.2,{TextColor3=DM}) end end)
+end
+tb.Hub.b.BackgroundTransparency,tb.Hub.bar.BackgroundTransparency=.3,0 pgs.Hub.Visible=true cur="Hub" tb.Hub.ss()
+
+-----------------------------------------------------
+-- ★ ENHANCED ELEMENT BUILDERS
+-----------------------------------------------------
+
+local function mkCard(pg,h,o)
+	local f=rk(4,ni("Frame",{Size=UDim2.new(1,0,0,h),BackgroundColor3=C.e,BackgroundTransparency=.06,BorderSizePixel=0,LayoutOrder=o or 0,ZIndex=3,ClipsDescendants=true},pg)) cr(f,8)
+	local st=rk(5,ni("UIStroke",{Color=C.br,Thickness=1,Transparency=.12},f))
+	local ab=rk(6,ni("Frame",{Size=UDim2.new(0,3,1,-12),Position=UDim2.new(0,5,0,6),BackgroundColor3=C.a,BackgroundTransparency=.15,BorderSizePixel=0,ZIndex=5},f)) cr(ab,2)
+	ni("Frame",{Size=UDim2.new(1,-2,0,1),Position=UDim2.new(0,1,0,0),BackgroundColor3=WH,BackgroundTransparency=.93,BorderSizePixel=0,ZIndex=4},f)
+	return f,st,ab
+end
+
+local function sec(pg,t,o)
+	local f=ni("Frame",{Size=UDim2.new(1,0,0,36),BackgroundTransparency=1,LayoutOrder=o or 0,ZIndex=3},pg)
+	local dot=ni("TextLabel",{Size=UDim2.new(0,14,0,14),Position=UDim2.new(0,2,.5,-7),BackgroundTransparency=1,Text="●",TextColor3=C.a,TextSize=8,Font=GF.t,ZIndex=4},f)
+	local l=ni("TextLabel",{Size=UDim2.new(1,-20,1,0),Position=UDim2.new(0,16,0,0),BackgroundTransparency=1,Text=string.upper(t),TextColor3=C.a,TextSize=FS,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},f)
+	local ln=ni("Frame",{Size=UDim2.new(1,-16,0,1),Position=UDim2.new(0,16,1,-3),BackgroundColor3=C.a,BackgroundTransparency=.35,BorderSizePixel=0,ZIndex=4},f)
+	ni("UIGradient",{Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,0),NumberSequenceKeypoint.new(.5,.4),NumberSequenceKeypoint.new(1,1)})},ln)
+	task.spawn(function() local i=1 while guiAlive and l and l.Parent do tw(l,.5,{TextColor3=C.mg[i]}) tw(dot,.5,{TextColor3=C.mg[i]}) task.wait(.6) i=i%#C.mg+1 end end)
+end
+
+local function inf(pg,t,o)
+	local f=ni("Frame",{Size=UDim2.new(1,0,0,22),BackgroundTransparency=1,LayoutOrder=o or 0,ZIndex=3},pg)
+	ni("TextLabel",{Size=UDim2.new(0,14,1,0),Position=UDim2.new(0,6,0,0),BackgroundTransparency=1,Text="›",TextColor3=C.a,TextSize=FS+2,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},f)
+	ni("TextLabel",{Size=UDim2.new(1,-26,1,0),Position=UDim2.new(0,20,0,0),BackgroundTransparency=1,Text=t,TextColor3=DM,TextSize=FS-1,Font=GF.d,TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true,AutomaticSize=Enum.AutomaticSize.Y,ZIndex=4},f)
+end
+
+local function btn(pg,t,o,fn)
+	local card,st,ab=mkCard(pg,EH,o)
+	ni("TextLabel",{Size=UDim2.new(1,-50,1,0),Position=UDim2.new(0,18,0,0),BackgroundTransparency=1,Text=t,TextColor3=TX,TextSize=FS,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},card)
+	local arr=ni("TextLabel",{Size=UDim2.new(0,20,1,0),Position=UDim2.new(1,-30,0,0),BackgroundTransparency=1,Text="›",TextColor3=C.a,TextSize=FS+8,Font=GF.t,TextXAlignment=Enum.TextXAlignment.Center,TextTransparency=.35,ZIndex=5},card)
+	local hgl=ni("Frame",{Size=UDim2.new(0,0,1,0),Position=UDim2.new(0,0,0,0),BackgroundColor3=C.a,BackgroundTransparency=.94,BorderSizePixel=0,ZIndex=3,ClipsDescendants=true},card) cr(hgl,8)
+	local c=ni("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=6},card)
+	c.MouseEnter:Connect(function()
+		tw(st,.15,{Color=C.a,Transparency=0}) tw(ab,.15,{BackgroundTransparency=0})
+		tw(arr,.2,{Position=UDim2.new(1,-25,0,0),TextTransparency=0})
+		tw(hgl,.25,{Size=UDim2.new(1,0,1,0)})
+	end)
+	c.MouseLeave:Connect(function()
+		tw(st,.15,{Color=C.br,Transparency=.12}) tw(ab,.15,{BackgroundTransparency=.15})
+		tw(arr,.2,{Position=UDim2.new(1,-30,0,0),TextTransparency=.35})
+		tw(hgl,.2,{Size=UDim2.new(0,0,1,0)})
+	end)
+	c.MouseButton1Click:Connect(function()
+		tw(card,.05,{BackgroundColor3=C.a,BackgroundTransparency=.08})
+		tw(ab,.05,{BackgroundColor3=WH})
+		task.wait(.1)
+		tw(card,.25,{BackgroundColor3=C.e,BackgroundTransparency=.06})
+		tw(ab,.25,{BackgroundColor3=C.a})
+		if fn then fn() end
+	end)
+end
+
+local function tog(pg,t,o,d,fn)
+	local on=d or false
+	local card,st,ab=mkCard(pg,EH,o)
+	ni("TextLabel",{Size=UDim2.new(1,-80,1,0),Position=UDim2.new(0,18,0,0),BackgroundTransparency=1,Text=t,TextColor3=TX,TextSize=FS,Font=GF.b,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},card)
+	local tW,tH=mob and 46 or 42,mob and 24 or 22
+	local kS=tH-4
+	local tGlow=ni("Frame",{Size=UDim2.new(0,tW+6,0,tH+6),Position=UDim2.new(1,-(tW+17),.5,-(tH+6)/2),BackgroundColor3=C.a,BackgroundTransparency=1,BorderSizePixel=0,ZIndex=4},card) cr(tGlow,99)
+	local tr=rk(3,ni("Frame",{Size=UDim2.new(0,tW,0,tH),Position=UDim2.new(1,-(tW+14),.5,-tH/2),BackgroundColor3=C.b3,BorderSizePixel=0,ZIndex=5},card)) cr(tr,99)
+	local k=ni("Frame",{Size=UDim2.new(0,kS,0,kS),Position=UDim2.new(0,2,.5,-kS/2),BackgroundColor3=Color3.fromRGB(170,170,180),BorderSizePixel=0,ZIndex=6},tr) cr(k,99)
+	local kGlow=ni("UIStroke",{Color=C.a,Thickness=0,Transparency=.3},k)
+	local function upd(a)
+		local ti=a and TweenInfo.new(.25,Enum.EasingStyle.Back,Enum.EasingDirection.Out) or TweenInfo.new(0)
+		local ti2=a and TweenInfo.new(.2) or TweenInfo.new(0)
+		TS:Create(tr,ti,{BackgroundColor3=on and C.a or C.b3}):Play()
+		TS:Create(k,ti,{Position=UDim2.new(0,on and tW-kS-2 or 2,.5,-kS/2),BackgroundColor3=on and WH or Color3.fromRGB(170,170,180)}):Play()
+		TS:Create(kGlow,ti2,{Thickness=on and 2.5 or 0}):Play()
+		TS:Create(tGlow,ti2,{BackgroundTransparency=on and .87 or 1}):Play()
+		TS:Create(st,ti2,{Color=on and C.a or C.br}):Play()
+		TS:Create(ab,ti2,{BackgroundTransparency=on and 0 or .15}):Play()
+	end
+	upd(false)
+	ni("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=7},card).MouseButton1Click:Connect(function() on=not on upd(true) if fn then fn(on) end end)
+end
+
+-- ★ FIXED SLIDER: single shared input connections instead of per-slider
+local activeSld=nil
+local function sld(pg,t,mi,ma,df,o,fn)
+	local v,pct=df or mi,((df or mi)-mi)/(ma-mi)
+	local card,st,ab=mkCard(pg,EH+26,o)
+	ni("TextLabel",{Size=UDim2.new(.6,-18,0,EH-4),Position=UDim2.new(0,18,0,3),BackgroundTransparency=1,Text=t,TextColor3=TX,TextSize=FS,Font=GF.b,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},card)
+	local vB=rk(3,ni("Frame",{Size=UDim2.new(0,50,0,22),Position=UDim2.new(1,-62,0,6),BackgroundColor3=C.b3,BackgroundTransparency=.05,BorderSizePixel=0,ZIndex=5},card)) cr(vB,6)
+	rk(7,ni("UIStroke",{Color=C.a,Thickness=1,Transparency=.35},vB))
+	local vl=ni("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=tostring(v),TextColor3=TX,TextSize=FS,Font=GF.t,ZIndex=6},vB)
+	local tk=rk(3,ni("Frame",{Size=UDim2.new(1,-28,0,6),Position=UDim2.new(0,14,0,EH+5),BackgroundColor3=C.b3,BorderSizePixel=0,ZIndex=4},card)) cr(tk,99)
+	local fl=rk(6,ni("Frame",{Size=UDim2.new(pct,0,1,0),BackgroundColor3=C.a,BorderSizePixel=0,ZIndex=5},tk)) cr(fl,99)
+	local fg=rk(6,ni("Frame",{Size=UDim2.new(pct,0,0,14),Position=UDim2.new(0,0,-.7,0),BackgroundColor3=C.a,BackgroundTransparency=.88,BorderSizePixel=0,ZIndex=3},tk)) cr(fg,99)
+	local kS=mob and 18 or 16
+	local kb=ni("Frame",{Size=UDim2.new(0,kS,0,kS),AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(pct,0,.5,0),BackgroundColor3=WH,BorderSizePixel=0,ZIndex=7},tk) cr(kb,99)
+	rk(7,ni("UIStroke",{Color=C.a,Thickness=2.5,Transparency=.08},kb))
+	ni("TextLabel",{Size=UDim2.new(0,30,0,14),Position=UDim2.new(0,14,0,EH+14),BackgroundTransparency=1,Text=tostring(mi),TextColor3=DM,TextSize=FS-3,Font=GF.d,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=4},card)
+	ni("TextLabel",{Size=UDim2.new(0,30,0,14),Position=UDim2.new(1,-44,0,EH+14),BackgroundTransparency=1,Text=tostring(ma),TextColor3=DM,TextSize=FS-3,Font=GF.d,TextXAlignment=Enum.TextXAlignment.Right,ZIndex=4},card)
+	local sldData={tk=tk,fl=fl,fg=fg,kb=kb,kS=kS,st=st,mi=mi,ma=ma,vl=vl,fn=fn,v=v}
+	local function upd(ix)
+		local tp,ts=tk.AbsolutePosition.X,tk.AbsoluteSize.X
+		if ts<1 then return end
+		local x=math.clamp((ix-tp)/ts,0,1)
+		sldData.v=math.floor(mi+x*(ma-mi)+.5)
+		local p2=(sldData.v-mi)/(ma-mi)
+		tw(fl,.05,{Size=UDim2.new(p2,0,1,0)}) tw(fg,.05,{Size=UDim2.new(p2,0,0,14)})
+		tw(kb,.05,{Position=UDim2.new(p2,0,.5,0)})
+		vl.Text=tostring(sldData.v)
+		if fn then fn(sldData.v) end
+	end
+	-- ★ Bigger touch area for mobile
+	local hit=ni("TextButton",{Size=UDim2.new(1,-16,0,mob and 36 or 30),Position=UDim2.new(0,8,0,EH-4),BackgroundTransparency=1,Text="",ZIndex=9},card)
+	hit.InputBegan:Connect(function(ii)
+		if ii.UserInputType==Enum.UserInputType.MouseButton1 or ii.UserInputType==Enum.UserInputType.Touch then
+			activeSld={upd=upd,st=st,kb=kb,kS=kS}
+			upd(ii.Position.X)
+			tw(st,.1,{Color=C.a}) tw(kb,.1,{Size=UDim2.new(0,kS+4,0,kS+4)})
+		end
+	end)
+end
+-- ★ SINGLE global connections for ALL sliders (no memory leak)
+UIS.InputChanged:Connect(function(ii)
+	if activeSld and(ii.UserInputType==Enum.UserInputType.MouseMovement or ii.UserInputType==Enum.UserInputType.Touch) then
+		activeSld.upd(ii.Position.X)
+	end
+end)
+UIS.InputEnded:Connect(function(ii)
+	if activeSld and(ii.UserInputType==Enum.UserInputType.MouseButton1 or ii.UserInputType==Enum.UserInputType.Touch) then
+		tw(activeSld.st,.15,{Color=C.br})
+		tw(activeSld.kb,.15,{Size=UDim2.new(0,activeSld.kS,0,activeSld.kS)})
+		activeSld=nil
+	end
+end)
+
+local function dd(pg,t,opF,o,d,fn)
+	local op,iH,isF=false,mob and 40 or 34,type(opF)=="function"
+	local cO=isF and(opF() or{}) or(opF or{})
+	local sel=d
+	local c2=ni("Frame",{Size=UDim2.new(1,0,0,EH),BackgroundTransparency=1,LayoutOrder=o or 0,ZIndex=3,ClipsDescendants=false},pg)
+	local card,st,ab=mkCard(c2,EH,0)
+	card.Size=UDim2.new(1,0,1,0) card.LayoutOrder=0
+	ni("TextLabel",{Size=UDim2.new(.42,-14,1,0),Position=UDim2.new(0,18,0,0),BackgroundTransparency=1,Text=t,TextColor3=TX,TextSize=FS,Font=GF.b,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=11},card)
+	local slP=rk(3,ni("Frame",{Size=UDim2.new(.5,-20,0,26),Position=UDim2.new(.42,4,.5,-13),BackgroundColor3=C.b3,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=11},card)) cr(slP,6)
+	local vlb=ni("TextLabel",{Size=UDim2.new(1,-24,1,0),Position=UDim2.new(0,8,0,0),BackgroundTransparency=1,Text=sel or"Select...",TextColor3=sel and TX or DM,TextSize=FS-1,Font=sel and GF.t or GF.d,TextXAlignment=Enum.TextXAlignment.Right,TextTruncate=Enum.TextTruncate.AtEnd,ZIndex=12},slP)
+	local chev=ni("TextLabel",{Size=UDim2.new(0,20,1,0),Position=UDim2.new(1,-20,0,0),BackgroundTransparency=1,Text="▾",TextColor3=DM,TextSize=FS,Font=GF.t,ZIndex=12},slP)
+	local df=rk(2,ni("Frame",{BackgroundColor3=C.b2,BorderSizePixel=0,Visible=false,ZIndex=55,ClipsDescendants=true},ov)) cr(df,8)
+	ni("UIStroke",{Color=C.a,Thickness=1,Transparency=.4},df)
+	local ds=rk(8,ni("ScrollingFrame",{Size=UDim2.new(1,-4,1,-4),Position=UDim2.new(0,2,0,2),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,ScrollBarImageColor3=C.a,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(0,0,0,0),ZIndex=56},df))
+	ni("UIListLayout",{Padding=UDim.new(0,3),SortOrder=Enum.SortOrder.LayoutOrder},ds)
+	ni("UIPadding",{PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5),PaddingLeft=UDim.new(0,5),PaddingRight=UDim.new(0,5)},ds)
+	local bk=ni("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=52,Visible=false},ov)
+	local obs,cl={},nil
+	local function build()
+		for _,b in pairs(obs) do b:Destroy() end obs={}
+		if #cO==0 then
+			local ob=ni("TextButton",{Size=UDim2.new(1,0,0,iH),BackgroundColor3=C.b3,BackgroundTransparency=.1,Text="No options",TextColor3=DM,TextSize=FS,Font=GF.d,AutoButtonColor=false,ZIndex=58},ds) cr(ob,6) table.insert(obs,ob) return
+		end
+		for idx,opt in ipairs(cO) do
+			local is=opt==sel
+			local ob=ni("TextButton",{Size=UDim2.new(1,0,0,iH),BackgroundColor3=is and C.a or C.b3,BackgroundTransparency=is and .55 or.05,Text="",AutoButtonColor=false,LayoutOrder=idx,ZIndex=58},ds) cr(ob,6)
+			if is then local abr=ni("Frame",{Size=UDim2.new(0,3,1,-8),Position=UDim2.new(0,4,0,4),BackgroundColor3=C.a,BorderSizePixel=0,ZIndex=59},ob) cr(abr,2) end
+			ni("TextLabel",{Size=UDim2.new(1,is and-40 or-16,1,0),Position=UDim2.new(0,is and 14 or 8,0,0),BackgroundTransparency=1,Text=opt,TextColor3=is and WH or TX,TextSize=FS,Font=is and GF.t or GF.b,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=59},ob)
+			if is then ni("TextLabel",{Size=UDim2.new(0,22,1,0),Position=UDim2.new(1,-28,0,0),BackgroundTransparency=1,Text="✓",TextColor3=WH,TextSize=FS,Font=GF.t,ZIndex=60},ob) end
+			ob.MouseEnter:Connect(function() if opt~=sel then tw(ob,.1,{BackgroundColor3=C.e,BackgroundTransparency=0}) end end)
+			ob.MouseLeave:Connect(function() if opt~=sel then tw(ob,.1,{BackgroundColor3=C.b3,BackgroundTransparency=.05}) end end)
+			ob.MouseButton1Click:Connect(function() sel=opt vlb.Text,vlb.TextColor3,vlb.Font=sel,TX,GF.t cl() if fn then fn(sel) end end)
+			table.insert(obs,ob)
+		end
+	end
+	cl=function() if not op then return end op=false tw(chev,.2,{Rotation=0}) tw(st,.15,{Color=C.br}) tw(ab,.15,{BackgroundTransparency=.15}) TS:Create(df,TweenInfo.new(.15),{Size=UDim2.new(0,df.Size.X.Offset,0,0),BackgroundTransparency=1}):Play() task.delay(.15,function() df.Visible,bk.Visible=false,false end) if adc==cl then adc=nil end end
+	local function opn()
+		if adc and adc~=cl then adc() end op,adc=true,cl
+		if isF then cO=opF() or{} end build()
+		local ap,as,op2=card.AbsolutePosition,card.AbsoluteSize,ov.AbsolutePosition
+		local lH=math.min(math.max(#cO,1),5)*(iH+3)+14
+		local xx,yy=ap.X-op2.X,ap.Y-op2.Y+as.Y+4
+		if yy+lH>ov.AbsoluteSize.Y then yy=ap.Y-op2.Y-lH-4 end
+		df.Position,df.Size,df.BackgroundTransparency,df.Visible,bk.Visible=UDim2.new(0,xx,0,yy),UDim2.new(0,as.X,0,0),1,true,true
+		tw(chev,.2,{Rotation=180}) tw(st,.15,{Color=C.a}) tw(ab,.15,{BackgroundTransparency=0})
+		TS:Create(df,TweenInfo.new(.2,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=UDim2.new(0,as.X,0,lH),BackgroundTransparency=0}):Play()
+	end
+	ni("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=12},card).MouseButton1Click:Connect(function() if op then cl() else opn() end end)
+	bk.MouseButton1Click:Connect(cl)
+	card.MouseEnter:Connect(function() if not op then tw(card,.1,{BackgroundTransparency=0}) tw(st,.1,{Color=C.a,Transparency=.3}) end end)
+	card.MouseLeave:Connect(function() if not op then tw(card,.1,{BackgroundTransparency=.06}) tw(st,.1,{Color=C.br,Transparency=.12}) end end)
+	if isF then task.spawn(function() while guiAlive and c2 and c2.Parent do task.wait(1) local ok,nO=pcall(opF) cO=ok and nO or{} if sel then local f=false for _,vv in ipairs(cO) do if vv==sel then f=true break end end if not f then sel=nil vlb.Text,vlb.TextColor3,vlb.Font="Select...",DM,GF.d if fn then pcall(fn,nil) end end end if op and df.Visible then build() tw(df,.15,{Size=UDim2.new(0,card.AbsoluteSize.X,0,math.min(math.max(#cO,1),5)*(iH+3)+14)}) end end end) end
+end
+
+-----------------------------------------------------
+-- ★ ENHANCED NOTIFICATIONS
+-----------------------------------------------------
+local function Notif(ti,ms,k)
+	local cols={info=C.a,success=Color3.fromRGB(34,197,94),error=Color3.fromRGB(220,50,50),warn=Color3.fromRGB(234,179,8)}
+	local ac=cols[k] or cols.info
+	local nf=ni("Frame",{Size=UDim2.new(0,280,0,62),Position=UDim2.new(1,10,1,-80),BackgroundColor3=C.b1,BorderSizePixel=0,ZIndex=200},sg) cr(nf,10)
+	ni("UIStroke",{Color=ac,Thickness=1.5,Transparency=.15},nf)
+	local nb=ni("Frame",{Size=UDim2.new(0,3,1,-14),Position=UDim2.new(0,7,0,7),BackgroundColor3=ac,BorderSizePixel=0,ZIndex=201},nf) cr(nb,2)
+	local icons={info="ℹ",success="✓",error="✕",warn="⚠"}
+	local ib=ni("Frame",{Size=UDim2.new(0,22,0,22),Position=UDim2.new(0,18,0,10),BackgroundColor3=ac,BackgroundTransparency=.85,BorderSizePixel=0,ZIndex=201},nf) cr(ib,11)
+	ni("TextLabel",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text=icons[k] or"ℹ",TextColor3=ac,Font=GF.t,TextSize=12,ZIndex=202},ib)
+	ni("TextLabel",{Size=UDim2.new(1,-52,0,18),Position=UDim2.new(0,46,0,9),BackgroundTransparency=1,Text=ti,TextColor3=TX,Font=GF.t,TextSize=13,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=201},nf)
+	ni("TextLabel",{Size=UDim2.new(1,-52,0,14),Position=UDim2.new(0,46,0,30),BackgroundTransparency=1,Text=ms,TextColor3=DM,Font=GF.d,TextSize=11,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=201},nf)
+	local pb=ni("Frame",{Size=UDim2.new(1,-12,0,2),Position=UDim2.new(0,6,1,-6),BackgroundColor3=ac,BorderSizePixel=0,ZIndex=202},nf) cr(pb,1)
+	TS:Create(nf,TweenInfo.new(.35,Enum.EasingStyle.Quint),{Position=UDim2.new(1,-300,1,-80)}):Play()
+	TS:Create(pb,TweenInfo.new(3,Enum.EasingStyle.Linear),{Size=UDim2.new(0,0,0,2)}):Play()
+	task.delay(3,function()
+		TS:Create(nf,TweenInfo.new(.3),{Position=UDim2.new(1,10,1,-80)}):Play()
+		task.delay(.35,function() nf:Destroy() end)
+	end)
+end
+
+-----------------------------------------------------
+-- ★ HUB PAGE
+-----------------------------------------------------
+sec(pgs.Hub,"Welcome",1)
+inf(pgs.Hub,"CK's Hub v2.2 — Premium GUI Framework",2)
+inf(pgs.Hub,"discord.gg/escypvhJHu",3)
+btn(pgs.Hub,"Copy Discord Invite",4,function() pcall(function() setclipboard("discord.gg/escypvhJHu") end) Notif("Discord","Invite link copied!","success") end)
+sec(pgs.Hub,"Demo Elements",5)
+btn(pgs.Hub,"Test Button",6,function() Notif("Button","Clicked successfully!","info") end)
+tog(pgs.Hub,"Test Toggle",7,false,function(v) Notif("Toggle",v and"Enabled"or"Disabled",v and"success"or"warn") end)
+sld(pgs.Hub,"Test Slider",0,100,50,8,function(v) print("Slider:",v) end)
+dd(pgs.Hub,"Test Dropdown",{"Option 1","Option 2","Option 3"},9,nil,function(v) Notif("Selected",v or"None","info") end)
+sec(pgs.Hub,"Information",10)
+inf(pgs.Hub,"Use the sidebar to navigate between tabs",11)
+inf(pgs.Hub,"All elements support theme switching",12)
+
+-----------------------------------------------------
+-- ★ CONFIG PAGE
+-----------------------------------------------------
+sec(pgs.Config,"Appearance",1)
+dd(pgs.Config,"Theme",{"Purple","Blue","Red","Green","Orange","Cyan","Pink"},2,"Purple",function(v)
+	local map={Purple="P",Blue="B",Red="R",Green="G",Orange="O",Cyan="C",Pink="K"}
+	if Th[map[v]] then aT(Th[map[v]]) Notif("Theme","Switched to "..v,"success") end
+end)
+inf(pgs.Config,"Select a theme to customize the UI",3)
+sec(pgs.Config,"Actions",4)
+btn(pgs.Config,"Destroy GUI",5,function() sg:Destroy() end)
+inf(pgs.Config,"This will permanently close the GUI",6)
+
+-----------------------------------------------------
+-- DRAG / MINIMIZE / CLOSE
+-----------------------------------------------------
+do local dg,di,ds,sp hdr.InputBegan:Connect(function(ii) if ii.UserInputType==Enum.UserInputType.MouseButton1 or ii.UserInputType==Enum.UserInputType.Touch then dg,ds,sp=true,ii.Position,mn.Position ii.Changed:Connect(function() if ii.UserInputState==Enum.UserInputState.End then dg=false end end) end end) hdr.InputChanged:Connect(function(ii) if ii.UserInputType==Enum.UserInputType.MouseMovement or ii.UserInputType==Enum.UserInputType.Touch then di=ii end end) UIS.InputChanged:Connect(function(ii) if ii==di and dg then local d=ii.Position-ds mn.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y) end end) end
+local full=UDim2.new(0,GW,0,GH)
+local function doMin() if adc then adc() end TS:Create(mn,TweenInfo.new(.25),{Size=UDim2.new(0,0,0,0),Position=UDim2.new(mn.Position.X.Scale,mn.Position.X.Offset+GW/2,mn.Position.Y.Scale,mn.Position.Y.Offset+GH/2)}):Play() task.delay(.25,function() mn.Visible,floatBtn.Visible=false,true end) end
+local function doRes() floatBtn.Visible,mn.Visible,mn.Size=false,true,UDim2.new(0,0,0,0) local ss=sg.AbsoluteSize mn.Position=UDim2.new(0,ss.X/2,0,ss.Y/2) TS:Create(mn,TweenInfo.new(.3,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=full,Position=UDim2.new(0,ss.X/2-GW/2,0,ss.Y/2-GH/2)}):Play() end
+mbtn.MouseButton1Click:Connect(doMin) cbtn.MouseButton1Click:Connect(function() if adc then adc() end TS:Create(mn,TweenInfo.new(.2),{Size=UDim2.new(0,0,0,0)}):Play() task.wait(.25) sg:Destroy() end) floatBtn.MouseButton1Click:Connect(doRes)
+mn.Size=UDim2.new(0,GW,0,0) TS:Create(mn,TweenInfo.new(.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=full}):Play()
+
+print("[MD's Hub] Mobile-Safe Framework Loaded — 99 nights")
