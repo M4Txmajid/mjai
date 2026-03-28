@@ -108,6 +108,9 @@ local GF,TX,DM,WH={t=Enum.Font.FredokaOne,b=Enum.Font.GothamSemibold,d=Enum.Font
 
 -- ===================== GUI SIZE SETTINGS =====================
 -- Edit the MOBILE values below (left number = mobile, right number = PC)
+
+-- ===================== GUI SIZE SETTINGS =====================
+-- Edit the MOBILE values below (left number = mobile, right number = PC)
 local MOB_WIDTH        = 520 -- GUI width on mobile
 local MOB_HEIGHT       = 420 -- GUI height on mobile
 local MOB_SIDEBAR      = 85  -- Sidebar width on mobile
@@ -119,7 +122,7 @@ local PC_WIDTH         = 580  -- GUI width on PC (don't touch)
 local PC_HEIGHT        = 480  -- GUI height on PC (don't touch)
 local PC_SIDEBAR       = 145  -- Sidebar width on PC (don't touch)
 local PC_HEADER        = 52   -- Header height on PC (don't touch)
-local PC_ELEM_HEIGHT   = 42   -- Element height on PC (don't touch)
+local PC_ELEM_HEIGHT   = 20   -- Element height on PC (don't touch)
 local PC_FONT_SIZE     = 13   -- Font size on PC (don't touch)
 -- =============================================================
 
@@ -416,7 +419,21 @@ dd(pgs.Items,"Item",scanItems,2,nil,function(v) BRING_ITEM=v end)
 btn(pgs.Items,"Bring Item",3,function() if BRING_ITEM then bringName(BRING_ITEM) Notif("Brought",BRING_ITEM,"success") else Notif("","Select item first","warn") end end)
 dd(pgs.Items,"Food",function() return scanByList(FOOD) end,4,nil,function(v) BRING_FOOD=v end)
 btn(pgs.Items,"Bring Food",5,function() if BRING_FOOD then bringName(BRING_FOOD) Notif("Brought",BRING_FOOD,"success") else Notif("","Select food first","warn") end end)
-btn(pgs.Items,"Bring All Items",6,function()
+btn(pgs.Items,"Bring All Food",6,function()
+	local f=workspace:FindFirstChild("Items") if not f or not HRP or not HRP.Parent then return end
+	local count=0
+	for _,c in pairs(f:GetChildren()) do
+		for _,n in ipairs(FOOD) do
+			if c.Name==n then
+				local p=c:FindFirstChildWhichIsA("BasePart",true)
+				if p then p.CFrame=HRP.CFrame*CFrame.new(math.random(-4,4),15,math.random(-4,4)) pcall(function() ReqDrag:FireServer(c) end) count+=1 end
+				break
+			end
+		end
+	end
+	Notif("Food",count>0 and count.." brought"or"None found",count>0 and"success"or"warn")
+end)
+btn(pgs.Items,"Bring All Items",7,function()
 	local f=workspace:FindFirstChild("Items") if not f then return end local c=0
 	for _,ch in pairs(f:GetChildren()) do local p=ch:FindFirstChildWhichIsA("BasePart",true) if p then p.CFrame=HRP.CFrame*CFrame.new(math.random(-8,8),math.random(20,45),math.random(-8,8)) pcall(function() ReqDrag:FireServer(ch) end) c+=1 end end
 	Notif("Items",c.." brought","success")
@@ -444,8 +461,11 @@ local acG=0 tog(pgs.Craft,"Auto Craft",4,false,function(v) AUTO_CRAFT=v if v the
 sec(pgs.Craft,"Grinder",5)
 dd(pgs.Craft,"Grind Item",scanGrind,6,nil,function(v) GRIND_ITEM=v end)
 local function doGrind() if not GRIND_ITEM then return 0 end local f=workspace:FindFirstChild("Items") if not f then return 0 end local d=0 for _,c in pairs(f:GetChildren()) do if c.Name==GRIND_ITEM then local p=c.PrimaryPart or c:FindFirstChildWhichIsA("BasePart",true) if p then p.CFrame=SCRAPPER*CFrame.new(math.random(-1,1)*.3,1.5,math.random(-1,1)*.3) pcall(function() ReqDrag:FireServer(c) end) d+=1 end end end return d end
+local function doGrindAll() local f=workspace:FindFirstChild("Items") if not f then return 0 end local d=0 for _,c in pairs(f:GetChildren()) do local sc,cg,ig=c:GetAttribute("Scrappable"),false,false pcall(function() cg=c:HasTag("CanBeGrinded") ig=c:HasTag("Gem") end) if sc or cg or ig then local p=c.PrimaryPart or c:FindFirstChildWhichIsA("BasePart",true) if p then p.CFrame=SCRAPPER*CFrame.new(math.random(-1,1)*.3,1.5,math.random(-1,1)*.3) pcall(function() ReqDrag:FireServer(c) end) d+=1 end end end return d end
 btn(pgs.Craft,"Grind Items",7,function() local n=doGrind() Notif("Grind",n>0 and n.." sent"or"None found",n>0 and"success"or"warn") end)
-local agG=0 tog(pgs.Craft,"Auto Grind",8,false,function(v) AUTO_GRIND=v if v then agG+=1 local g=agG task.spawn(function() while AUTO_GRIND and agG==g do pcall(doGrind) task.wait(2) end end) end Notif("Grind",v and"ON"or"OFF",v and"success"or"warn") end)
+btn(pgs.Craft,"Grind All Items",8,function() local n=doGrindAll() Notif("Grind All",n>0 and n.." sent"or"None found",n>0 and"success"or"warn") end)
+local agG=0 tog(pgs.Craft,"Auto Grind",9,false,function(v) AUTO_GRIND=v if v then agG+=1 local g=agG task.spawn(function() while AUTO_GRIND and agG==g do pcall(doGrind) task.wait(2) end end) end Notif("Grind",v and"ON"or"OFF",v and"success"or"warn") end)
+local agAllG=0 tog(pgs.Craft,"Auto Grind All",10,false,function(v) if v then agAllG+=1 local g=agAllG task.spawn(function() while v and agAllG==g do pcall(doGrindAll) task.wait(2) end end) end Notif("Grind All",v and"ON"or"OFF",v and"success"or"warn") end)
 
 -- WORLD
 sec(pgs.World,"Teleport",1)
@@ -553,11 +573,31 @@ tog(pgs.Egg,"Auto Bring Selected Egg",5,false,function(v)
 	end
 	Notif("Egg",v and"Auto Bring ON"or"Auto Bring OFF",v and"success"or"warn")
 end)
+local allEggBringRun=false
+tog(pgs.Egg,"Auto Bring ALL Eggs to Me",6,false,function(v)
+	allEggBringRun=v
+	if v then
+		task.spawn(function()
+			while allEggBringRun do
+				task.wait(.5)
+				if not allEggBringRun or not HRP or not HRP.Parent then continue end
+				local f=workspace:FindFirstChild("Items") if not f then continue end
+				for _,c in pairs(f:GetChildren()) do
+					if c.Name:lower():find("egg") then
+						local p=c:FindFirstChildWhichIsA("BasePart",true)
+						if p then p.CFrame=HRP.CFrame*CFrame.new(math.random(-3,3),4,math.random(-3,3)) pcall(function() ReqDrag:FireServer(c) end) end
+					end
+				end
+			end
+		end)
+	end
+	Notif("Egg",v and"Bring All ON"or"Bring All OFF",v and"success"or"warn")
+end)
 
-sec(pgs.Egg,"Easter Egg Zone",6)
-inf(pgs.Egg,"Live scan — send any egg by name to coordinates (2.6, 3.6, 71.1)",7)
-dd(pgs.Egg,"Select Egg",scanEggs,8,nil,function(v) SEL_EGG_ZONE=v end)
-btn(pgs.Egg,"Send Selected Egg to Zone",9,function()
+sec(pgs.Egg,"Easter Egg Zone",7)
+inf(pgs.Egg,"Live scan — send any egg by name to coordinates (2.6, 3.6, 71.1)",8)
+dd(pgs.Egg,"Select Egg",scanEggs,9,nil,function(v) SEL_EGG_ZONE=v end)
+btn(pgs.Egg,"Send Selected Egg to Zone",10,function()
 	if not SEL_EGG_ZONE then Notif("Egg","Select an egg first","warn") return end
 	local f=workspace:FindFirstChild("Items") if not f then return end
 	local count=0
@@ -570,7 +610,7 @@ btn(pgs.Egg,"Send Selected Egg to Zone",9,function()
 	Notif("Egg",count>0 and count.." sent to zone"or"Not found",count>0 and"success"or"warn")
 end)
 local autoEggG=0
-tog(pgs.Egg,"Auto Send Selected Egg to Zone",10,false,function(v)
+tog(pgs.Egg,"Auto Send Selected Egg to Zone",11,false,function(v)
 	autoEasterEgg=v
 	if v then
 		autoEggG+=1
@@ -590,6 +630,26 @@ tog(pgs.Egg,"Auto Send Selected Egg to Zone",10,false,function(v)
 		end)
 	end
 	Notif("Egg",v and"Auto Send ON"or"Auto Send OFF",v and"success"or"warn")
+end)
+local allEggZoneRun=false
+tog(pgs.Egg,"Auto Send ALL Eggs to Zone",12,false,function(v)
+	allEggZoneRun=v
+	if v then
+		task.spawn(function()
+			while allEggZoneRun do
+				task.wait(.5)
+				if not allEggZoneRun then continue end
+				local f=workspace:FindFirstChild("Items") if not f then continue end
+				for _,c in pairs(f:GetChildren()) do
+					if c.Name:lower():find("egg") then
+						local p=c:FindFirstChildWhichIsA("BasePart",true)
+						if p then p.CFrame=CFrame.new(EGG_COORDS) pcall(function() ReqDrag:FireServer(c) end) end
+					end
+				end
+			end
+		end)
+	end
+	Notif("Egg",v and"Send All ON"or"Send All OFF",v and"success"or"warn")
 end)
 -- CONFIG
 sec(pgs.Config,"Appearance",1)
