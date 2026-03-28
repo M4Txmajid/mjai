@@ -106,7 +106,30 @@ UIS.JumpRequest:Connect(function() if infJump then local c=P.Character if c then
 -- ===================== CK'S HUB GUI =====================
 local mob=UIS.TouchEnabled and not UIS.KeyboardEnabled
 local GF,TX,DM,WH={t=Enum.Font.FredokaOne,b=Enum.Font.GothamSemibold,d=Enum.Font.Gotham},Color3.fromRGB(235,235,240),Color3.fromRGB(120,120,138),Color3.new(1,1,1)
-local GW,GH,SW,TH,EH,FS=mob and 460 or 500,mob and 360 or 420,mob and 115 or 145,mob and 54 or 52,mob and 36 or 38,mob and 14 or 13
+
+-- ===================== GUI SIZE SETTINGS =====================
+-- Edit the MOBILE values below (left number = mobile, right number = PC)
+local MOB_WIDTH        = 480  -- GUI width on mobile
+local MOB_HEIGHT       = 420  -- GUI height on mobile
+local MOB_SIDEBAR      = 95  -- Sidebar width on mobile
+local MOB_HEADER       = 54   -- Header/title bar height on mobile
+local MOB_ELEM_HEIGHT  = 30   -- Button/toggle/slider height on mobile
+local MOB_FONT_SIZE    = 14   -- Font size on mobile
+
+local PC_WIDTH         = 580  -- GUI width on PC (don't touch)
+local PC_HEIGHT        = 480  -- GUI height on PC (don't touch)
+local PC_SIDEBAR       = 145  -- Sidebar width on PC (don't touch)
+local PC_HEADER        = 52   -- Header height on PC (don't touch)
+local PC_ELEM_HEIGHT   = 42   -- Element height on PC (don't touch)
+local PC_FONT_SIZE     = 13   -- Font size on PC (don't touch)
+-- =============================================================
+
+local GW = mob and MOB_WIDTH       or PC_WIDTH
+local GH = mob and MOB_HEIGHT      or PC_HEIGHT
+local SW = mob and MOB_SIDEBAR     or PC_SIDEBAR
+local TH = mob and MOB_HEADER      or PC_HEADER
+local EH = mob and MOB_ELEM_HEIGHT or PC_ELEM_HEIGHT
+local FS = mob and MOB_FONT_SIZE   or PC_FONT_SIZE
 
 local function safeFont(name,fallback) local ok,f=pcall(function() return Enum.Font[name] end) if ok and f then return f end return fallback or Enum.Font.FredokaOne end
 local titleFont=safeFont("PermanentMarker",Enum.Font.FredokaOne)
