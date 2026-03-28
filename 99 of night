@@ -1,4 +1,3 @@
-
 -- CK's Hub v2.2 — Full Game Logic Build
 local Players,UIS,TS,RS,CS,RunService=game:GetService("Players"),game:GetService("UserInputService"),game:GetService("TweenService"),game:GetService("ReplicatedStorage"),game:GetService("CollectionService"),game:GetService("RunService")
 local P,pGui=Players.LocalPlayer,Players.LocalPlayer:WaitForChild("PlayerGui")
@@ -110,7 +109,7 @@ local GF,TX,DM,WH={t=Enum.Font.FredokaOne,b=Enum.Font.GothamSemibold,d=Enum.Font
 -- ===================== GUI SIZE SETTINGS =====================
 -- Edit the MOBILE values below (left number = mobile, right number = PC)
 local MOB_WIDTH        = 580  -- GUI width on mobile
-local MOB_HEIGHT       = 420  -- GUI height on mobile
+local MOB_HEIGHT       = 500 -- GUI height on mobile
 local MOB_SIDEBAR      = 85  -- Sidebar width on mobile
 local MOB_HEADER       = 54   -- Header/title bar height on mobile
 local MOB_ELEM_HEIGHT  = 30   -- Button/toggle/slider height on mobile
