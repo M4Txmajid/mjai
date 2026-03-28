@@ -1,7 +1,7 @@
 -- MD's Hub GUI Framework v2.2 — Mobile-Safe Build
 local Players,UIS,TS=game:GetService("Players"),game:GetService("UserInputService"),game:GetService("TweenService")
 local P,pGui=Players.LocalPlayer,Players.LocalPlayer:WaitForChild("PlayerGui")
-for _,v in pairs(pGui:GetChildren()) do if v.Name=="MuslimHub" then v:Destroy() end end task.wait(.1)
+for _,v in pairs(pGui:GetChildren()) do if v.Name=="CKHub" then v:Destroy() end end task.wait(.1)
 
 local mob=UIS.TouchEnabled and not UIS.KeyboardEnabled
 local GF,TX,DM,WH={t=Enum.Font.FredokaOne,b=Enum.Font.GothamSemibold,d=Enum.Font.Gotham},Color3.fromRGB(235,235,240),Color3.fromRGB(120,120,138),Color3.new(1,1,1)
@@ -56,7 +56,7 @@ local function aT(t)
 	for _,v in pairs(shT) do if v.on then if v.th then task.cancel(v.th) end v.th=task.spawn(function() local i=1 while guiAlive do tw(v.ic,.4,{TextColor3=t.ts[i]}) tw(v.nm,.4,{TextColor3=t.ts[i]}) task.wait(.5) i=i%#t.ts+1 end end) end end
 end
 
-local sg=ni("ScreenGui",{Name="MuslimHub",ResetOnSpawn=false},pGui)
+local sg=ni("ScreenGui",{Name="CKHub",ResetOnSpawn=false},pGui)
 -- ★ KILL SWITCH: stop all loops when GUI destroyed
 sg.Destroying:Connect(function() guiAlive=false end)
 
@@ -70,7 +70,7 @@ rk(5,ni("Frame",{Size=UDim2.new(1,0,0,1),Position=UDim2.new(0,0,0,TH),Background
 
 -- ★ TITLE: "MD's Hub" + subtitle "99 nights" (safe fonts)
 local tf=ni("Frame",{Size=UDim2.new(0,260,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,ZIndex=6},hdr)
-mdL=ni("TextLabel",{Size=UDim2.new(0,62,0,26),Position=UDim2.new(0,0,0,3),BackgroundTransparency=1,Text="MD's",TextColor3=C.a,TextSize=mob and 20 or 19,Font=titleFont,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},tf)
+mdL=ni("TextLabel",{Size=UDim2.new(0,62,0,26),Position=UDim2.new(0,0,0,3),BackgroundTransparency=1,Text="CK's",TextColor3=C.a,TextSize=mob and 20 or 19,Font=titleFont,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},tf)
 huL=ni("TextLabel",{Size=UDim2.new(0,55,0,26),Position=UDim2.new(0,52,0,3),BackgroundTransparency=1,Text="Hub",TextColor3=TX,TextSize=mob and 20 or 19,Font=titleFont,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},tf)
 local subL=ni("TextLabel",{Size=UDim2.new(0,120,0,16),Position=UDim2.new(0,1,0,28),BackgroundTransparency=1,Text="99 nights",TextColor3=DM,TextSize=mob and 11 or 10,Font=medFont,TextXAlignment=Enum.TextXAlignment.Left,TextTransparency=.2,ZIndex=6},tf)
 local dotL=ni("TextLabel",{Size=UDim2.new(0,10,0,16),Position=UDim2.new(0,64,0,28),BackgroundTransparency=1,Text="·",TextColor3=C.a,TextSize=12,Font=boldFont,TextTransparency=.3,ZIndex=6},tf)
@@ -85,7 +85,7 @@ local cbtn,mbtn=mkBtn(mob and-44 or-36,Color3.fromRGB(200,55,55)),mkBtn(mob and-
 local x1,x2=mkL(cbtn,45),mkL(cbtn,-45) cbtn.MouseEnter:Connect(function() tw(x1,.12,{BackgroundColor3=WH}) tw(x2,.12,{BackgroundColor3=WH}) end) cbtn.MouseLeave:Connect(function() tw(x1,.12,{BackgroundColor3=DM}) tw(x2,.12,{BackgroundColor3=DM}) end)
 local mln=mkL(mbtn,0) mbtn.MouseEnter:Connect(function() tw(mln,.12,{BackgroundColor3=WH}) end) mbtn.MouseLeave:Connect(function() tw(mln,.12,{BackgroundColor3=DM}) end)
 
-local floatBtn=rk(6,ni("TextButton",{Size=UDim2.new(0,56,0,56),Position=UDim2.new(0,20,.5,-28),BackgroundColor3=C.a,BorderSizePixel=0,Text="MD",Font=GF.t,TextSize=16,TextColor3=WH,ZIndex=200,Visible=false},sg)) cr(floatBtn,28) ni("UIStroke",{Color=C.a,Thickness=2,Transparency=.3},floatBtn)
+local floatBtn=rk(6,ni("TextButton",{Size=UDim2.new(0,56,0,56),Position=UDim2.new(0,20,.5,-28),BackgroundColor3=C.a,BorderSizePixel=0,Text="CK",Font=GF.t,TextSize=16,TextColor3=WH,ZIndex=200,Visible=false},sg)) cr(floatBtn,28) ni("UIStroke",{Color=C.a,Thickness=2,Transparency=.3},floatBtn)
 
 local sd=rk(2,ni("Frame",{Size=UDim2.new(0,SW,1,0),BackgroundColor3=C.b2,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=3},mn)) cr(sd,12)
 rk(5,ni("Frame",{Size=UDim2.new(0,1,1,-(TH+1)),Position=UDim2.new(0,SW,0,TH+1),BackgroundColor3=C.br,BorderSizePixel=0,ZIndex=3},mn))
@@ -331,7 +331,7 @@ end
 -- ★ HUB PAGE
 -----------------------------------------------------
 sec(pgs.Hub,"Welcome",1)
-inf(pgs.Hub,"MD's Hub v2.2 — Premium GUI Framework",2)
+inf(pgs.Hub,"CK's Hub v2.2 — Premium GUI Framework",2)
 inf(pgs.Hub,"discord.gg/escypvhJHu",3)
 btn(pgs.Hub,"Copy Discord Invite",4,function() pcall(function() setclipboard("discord.gg/escypvhJHu") end) Notif("Discord","Invite link copied!","success") end)
 sec(pgs.Hub,"Demo Elements",5)
