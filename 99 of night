@@ -1,4 +1,4 @@
--- MD's Hub GUI Framework v2.2 — Mobile-Safe Build
+-- CK's Hub GUI Framework v2.2 — Mobile-Safe Build
 local Players,UIS,TS=game:GetService("Players"),game:GetService("UserInputService"),game:GetService("TweenService")
 local P,pGui=Players.LocalPlayer,Players.LocalPlayer:WaitForChild("PlayerGui")
 for _,v in pairs(pGui:GetChildren()) do if v.Name=="CKHub" then v:Destroy() end end task.wait(.1)
@@ -7,7 +7,6 @@ local mob=UIS.TouchEnabled and not UIS.KeyboardEnabled
 local GF,TX,DM,WH={t=Enum.Font.FredokaOne,b=Enum.Font.GothamSemibold,d=Enum.Font.Gotham},Color3.fromRGB(235,235,240),Color3.fromRGB(120,120,138),Color3.new(1,1,1)
 local GW,GH,SW,TH,EH,FS=mob and 420 or 580,mob and 420 or 480,mob and 115 or 145,mob and 54 or 52,mob and 44 or 42,mob and 14 or 13
 
--- ★ SAFE FONT LOADING (prevents crash on mobile executors)
 local function safeFont(name,fallback)
 	local ok,f=pcall(function() return Enum.Font[name] end)
 	if ok and f then return f end
@@ -30,7 +29,6 @@ local Th={
 local C,Reg,shT,adc,mnG,mdL,huL,mdT,huT={},{{},{},{},{},{},{},{},{}},{},nil,nil,nil,nil,nil,nil
 for k,v in pairs(Th.P) do C[k]=v end
 
--- ★ ALIVE CHECK (prevents orphaned loops)
 local guiAlive=true
 
 local function tw(o,d,p) TS:Create(o,TweenInfo.new(d),p):Play() end
@@ -57,7 +55,6 @@ local function aT(t)
 end
 
 local sg=ni("ScreenGui",{Name="CKHub",ResetOnSpawn=false},pGui)
--- ★ KILL SWITCH: stop all loops when GUI destroyed
 sg.Destroying:Connect(function() guiAlive=false end)
 
 local mn=rk(1,ni("Frame",{Size=UDim2.new(0,GW,0,GH),Position=UDim2.new(.5,-GW/2,.5,-GH/2),BackgroundColor3=C.b1,BorderSizePixel=0,ClipsDescendants=true},sg)) cr(mn,12)
@@ -68,7 +65,6 @@ task.spawn(function() while guiAlive and mn and mn.Parent do mnG.Rotation=0 TS:C
 local hdr=rk(2,ni("Frame",{Size=UDim2.new(1,0,0,TH),BackgroundColor3=C.b2,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=5},mn)) cr(hdr,12)
 rk(5,ni("Frame",{Size=UDim2.new(1,0,0,1),Position=UDim2.new(0,0,0,TH),BackgroundColor3=C.br,BorderSizePixel=0,ZIndex=5},mn))
 
--- ★ TITLE: "MD's Hub" + subtitle "99 nights" (safe fonts)
 local tf=ni("Frame",{Size=UDim2.new(0,260,1,0),Position=UDim2.new(0,14,0,0),BackgroundTransparency=1,ZIndex=6},hdr)
 mdL=ni("TextLabel",{Size=UDim2.new(0,62,0,26),Position=UDim2.new(0,0,0,3),BackgroundTransparency=1,Text="CK's",TextColor3=C.a,TextSize=mob and 20 or 19,Font=titleFont,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},tf)
 huL=ni("TextLabel",{Size=UDim2.new(0,55,0,26),Position=UDim2.new(0,52,0,3),BackgroundTransparency=1,Text="Hub",TextColor3=TX,TextSize=mob and 20 or 19,Font=titleFont,TextXAlignment=Enum.TextXAlignment.Left,ZIndex=6},tf)
@@ -78,7 +74,6 @@ mdT=task.spawn(glow,mdL,C.mg,.6,.7)
 huT=task.spawn(function() task.wait(.35) glow(huL,C.hg,.6,.7) end)
 task.spawn(function() while guiAlive and subL and subL.Parent do tw(subL,.8,{TextColor3=C.a,TextTransparency=.3}) task.wait(1.2) tw(subL,.8,{TextColor3=DM,TextTransparency=.2}) task.wait(1.2) end end)
 
--- ★ BIGGER TOUCH TARGETS for mobile (38px vs 30px)
 local function mkBtn(off,hc) local s=mob and 38 or 30 local b=ni("TextButton",{Size=UDim2.new(0,s,0,s),Position=UDim2.new(1,off,.5,-s/2),BackgroundTransparency=1,BackgroundColor3=C.b3,Text="",ZIndex=7},hdr) cr(b,7) b.MouseEnter:Connect(function() tw(b,.12,{BackgroundTransparency=0,BackgroundColor3=hc}) end) b.MouseLeave:Connect(function() tw(b,.12,{BackgroundTransparency=1}) end) return b end
 local function mkL(p,r,s) local l=ni("Frame",{Size=UDim2.new(0,s or 14,0,2),AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,0),BackgroundColor3=DM,BorderSizePixel=0,Rotation=r or 0,ZIndex=8},p) cr(l,2) return l end
 local cbtn,mbtn=mkBtn(mob and-44 or-36,Color3.fromRGB(200,55,55)),mkBtn(mob and-88 or-72,C.b3)
@@ -87,6 +82,7 @@ local mln=mkL(mbtn,0) mbtn.MouseEnter:Connect(function() tw(mln,.12,{BackgroundC
 
 local floatBtn=rk(6,ni("TextButton",{Size=UDim2.new(0,56,0,56),Position=UDim2.new(0,20,.5,-28),BackgroundColor3=C.a,BorderSizePixel=0,Text="",ZIndex=200,Visible=false},sg)) cr(floatBtn,28) ni("UIStroke",{Color=C.a,Thickness=2,Transparency=.3},floatBtn)
 local floatImg=ni("ImageLabel",{Size=UDim2.new(0,40,0,40),AnchorPoint=Vector2.new(.5,.5),Position=UDim2.new(.5,0,.5,0),BackgroundTransparency=1,Image="rbxassetid://75252803788136",ScaleType=Enum.ScaleType.Fit,ZIndex=201},floatBtn) cr(floatImg,20)
+
 local sd=rk(2,ni("Frame",{Size=UDim2.new(0,SW,1,0),BackgroundColor3=C.b2,BackgroundTransparency=.2,BorderSizePixel=0,ZIndex=3},mn)) cr(sd,12)
 rk(5,ni("Frame",{Size=UDim2.new(0,1,1,-(TH+1)),Position=UDim2.new(0,SW,0,TH+1),BackgroundColor3=C.br,BorderSizePixel=0,ZIndex=3},mn))
 local sdScr=ni("ScrollingFrame",{Size=UDim2.new(1,0,1,-(TH+11)),Position=UDim2.new(0,0,0,TH+11),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=0,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(0,0,0,0),ScrollingDirection=Enum.ScrollingDirection.Y,ClipsDescendants=true},sd)
@@ -99,7 +95,6 @@ local pc=ni("Frame",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,ZIndex=2,C
 local ctBg=ni("Frame",{Size=UDim2.new(1,0,1,0),BackgroundColor3=C.b1,BackgroundTransparency=.6,BorderSizePixel=0,ZIndex=1},ctArea) cr(ctBg,0)
 ni("UIGradient",{Rotation=145,Transparency=NumberSequence.new({NumberSequenceKeypoint.new(0,.85),NumberSequenceKeypoint.new(.5,.95),NumberSequenceKeypoint.new(1,.98)})},ctBg)
 
--- TAB SYSTEM
 local tl,pgs,tb,cur={{"Hub","H"},{"Config","G"}},{},{},nil
 for i,v in ipairs(tl) do
 	local nm,ic=v[1],v[2]
@@ -119,10 +114,6 @@ for i,v in ipairs(tl) do
 	b.MouseLeave:Connect(function() if cur~=nm then tw(b,.15,{BackgroundTransparency=1}) tw(tic,.2,{TextColor3=DM}) tw(tnm,.2,{TextColor3=DM}) end end)
 end
 tb.Hub.b.BackgroundTransparency,tb.Hub.bar.BackgroundTransparency=.3,0 pgs.Hub.Visible=true cur="Hub" tb.Hub.ss()
-
------------------------------------------------------
--- ★ ENHANCED ELEMENT BUILDERS
------------------------------------------------------
 
 local function mkCard(pg,h,o)
 	local f=rk(4,ni("Frame",{Size=UDim2.new(1,0,0,h),BackgroundColor3=C.e,BackgroundTransparency=.06,BorderSizePixel=0,LayoutOrder=o or 0,ZIndex=3,ClipsDescendants=true},pg)) cr(f,8)
@@ -197,7 +188,6 @@ local function tog(pg,t,o,d,fn)
 	ni("TextButton",{Size=UDim2.new(1,0,1,0),BackgroundTransparency=1,Text="",ZIndex=7},card).MouseButton1Click:Connect(function() on=not on upd(true) if fn then fn(on) end end)
 end
 
--- ★ FIXED SLIDER: single shared input connections instead of per-slider
 local activeSld=nil
 local function sld(pg,t,mi,ma,df,o,fn)
 	local v,pct=df or mi,((df or mi)-mi)/(ma-mi)
@@ -226,7 +216,6 @@ local function sld(pg,t,mi,ma,df,o,fn)
 		vl.Text=tostring(sldData.v)
 		if fn then fn(sldData.v) end
 	end
-	-- ★ Bigger touch area for mobile
 	local hit=ni("TextButton",{Size=UDim2.new(1,-16,0,mob and 36 or 30),Position=UDim2.new(0,8,0,EH-4),BackgroundTransparency=1,Text="",ZIndex=9},card)
 	hit.InputBegan:Connect(function(ii)
 		if ii.UserInputType==Enum.UserInputType.MouseButton1 or ii.UserInputType==Enum.UserInputType.Touch then
@@ -236,7 +225,6 @@ local function sld(pg,t,mi,ma,df,o,fn)
 		end
 	end)
 end
--- ★ SINGLE global connections for ALL sliders (no memory leak)
 UIS.InputChanged:Connect(function(ii)
 	if activeSld and(ii.UserInputType==Enum.UserInputType.MouseMovement or ii.UserInputType==Enum.UserInputType.Touch) then
 		activeSld.upd(ii.Position.X)
@@ -304,9 +292,6 @@ local function dd(pg,t,opF,o,d,fn)
 	if isF then task.spawn(function() while guiAlive and c2 and c2.Parent do task.wait(1) local ok,nO=pcall(opF) cO=ok and nO or{} if sel then local f=false for _,vv in ipairs(cO) do if vv==sel then f=true break end end if not f then sel=nil vlb.Text,vlb.TextColor3,vlb.Font="Select...",DM,GF.d if fn then pcall(fn,nil) end end end if op and df.Visible then build() tw(df,.15,{Size=UDim2.new(0,card.AbsoluteSize.X,0,math.min(math.max(#cO,1),5)*(iH+3)+14)}) end end end) end
 end
 
------------------------------------------------------
--- ★ ENHANCED NOTIFICATIONS
------------------------------------------------------
 local function Notif(ti,ms,k)
 	local cols={info=C.a,success=Color3.fromRGB(34,197,94),error=Color3.fromRGB(220,50,50),warn=Color3.fromRGB(234,179,8)}
 	local ac=cols[k] or cols.info
@@ -327,9 +312,6 @@ local function Notif(ti,ms,k)
 	end)
 end
 
------------------------------------------------------
--- ★ HUB PAGE
------------------------------------------------------
 sec(pgs.Hub,"Welcome",1)
 inf(pgs.Hub,"CK's Hub v2.2 — Premium GUI Framework",2)
 inf(pgs.Hub,"discord.gg/escypvhJHu",3)
@@ -343,9 +325,6 @@ sec(pgs.Hub,"Information",10)
 inf(pgs.Hub,"Use the sidebar to navigate between tabs",11)
 inf(pgs.Hub,"All elements support theme switching",12)
 
------------------------------------------------------
--- ★ CONFIG PAGE
------------------------------------------------------
 sec(pgs.Config,"Appearance",1)
 dd(pgs.Config,"Theme",{"Purple","Blue","Red","Green","Orange","Cyan","Pink"},2,"Purple",function(v)
 	local map={Purple="P",Blue="B",Red="R",Green="G",Orange="O",Cyan="C",Pink="K"}
@@ -356,9 +335,6 @@ sec(pgs.Config,"Actions",4)
 btn(pgs.Config,"Destroy GUI",5,function() sg:Destroy() end)
 inf(pgs.Config,"This will permanently close the GUI",6)
 
------------------------------------------------------
--- DRAG / MINIMIZE / CLOSE
------------------------------------------------------
 do local dg,di,ds,sp hdr.InputBegan:Connect(function(ii) if ii.UserInputType==Enum.UserInputType.MouseButton1 or ii.UserInputType==Enum.UserInputType.Touch then dg,ds,sp=true,ii.Position,mn.Position ii.Changed:Connect(function() if ii.UserInputState==Enum.UserInputState.End then dg=false end end) end end) hdr.InputChanged:Connect(function(ii) if ii.UserInputType==Enum.UserInputType.MouseMovement or ii.UserInputType==Enum.UserInputType.Touch then di=ii end end) UIS.InputChanged:Connect(function(ii) if ii==di and dg then local d=ii.Position-ds mn.Position=UDim2.new(sp.X.Scale,sp.X.Offset+d.X,sp.Y.Scale,sp.Y.Offset+d.Y) end end) end
 local full=UDim2.new(0,GW,0,GH)
 local function doMin() if adc then adc() end TS:Create(mn,TweenInfo.new(.25),{Size=UDim2.new(0,0,0,0),Position=UDim2.new(mn.Position.X.Scale,mn.Position.X.Offset+GW/2,mn.Position.Y.Scale,mn.Position.Y.Offset+GH/2)}):Play() task.delay(.25,function() mn.Visible,floatBtn.Visible=false,true end) end
@@ -366,4 +342,4 @@ local function doRes() floatBtn.Visible,mn.Visible,mn.Size=false,true,UDim2.new(
 mbtn.MouseButton1Click:Connect(doMin) cbtn.MouseButton1Click:Connect(function() if adc then adc() end TS:Create(mn,TweenInfo.new(.2),{Size=UDim2.new(0,0,0,0)}):Play() task.wait(.25) sg:Destroy() end) floatBtn.MouseButton1Click:Connect(doRes)
 mn.Size=UDim2.new(0,GW,0,0) TS:Create(mn,TweenInfo.new(.35,Enum.EasingStyle.Back,Enum.EasingDirection.Out),{Size=full}):Play()
 
-print("[MD's Hub] Mobile-Safe Framework Loaded — 99 nights")
+print("[CK's Hub] Mobile-Safe Framework Loaded — 99 nights")
