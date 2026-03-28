@@ -112,7 +112,7 @@ local MOB_WIDTH        = 700 -- GUI width on mobile
 local MOB_HEIGHT       = 500 -- GUI height on mobile
 local MOB_SIDEBAR      = 85  -- Sidebar width on mobile
 local MOB_HEADER       = 54   -- Header/title bar height on mobile
-local MOB_ELEM_HEIGHT  = 24   -- Button/toggle/slider height on mobile
+local MOB_ELEM_HEIGHT  = 20   -- Button/toggle/slider height on mobile
 local MOB_FONT_SIZE    = 14   -- Font size on mobile
 
 local PC_WIDTH         = 580  -- GUI width on PC (don't touch)
